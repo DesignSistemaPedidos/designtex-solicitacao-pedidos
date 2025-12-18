@@ -1,0 +1,53 @@
+{
+  "timestamp": "09/12/2025 14:58:02",
+  "dados_cabecalho": {
+    "representante": "teste3",
+    "razao_social": "EMPRESA ABC LTDA",
+    "cnpj": "12.345.678/0001-90",
+    "telefone": "(31) 99333-6786"
+  },
+  "dados_corpo": {
+    "prazo_pagamento": "14 dias",
+    "tipo_pedido": "PE - Pronta-entrega",
+    "tipo_frete": "CIF",
+    "transportadora_fob": "tranportadora fob teste3",
+    "transportadora_cif": "",
+    "venda_triangular": "Não",
+    "dados_triangulacao": "",
+    "regime_ret": "Não",
+    "tipo_produto": "Liso"
+  },
+  "tabela_precos": {
+    "icms_normal": "ICMS 18%",
+    "icms_ld": ""
+  },
+  "produtos": [
+    {
+      "artigo": "linho teste 3",
+      "codigo": "1002",
+      "desenho_cor": "azul maya",
+      "metragem": 500,
+      "preco": 16.7,
+      "subtotal": 8350
+    },
+    {
+      "artigo": "top line teste 3",
+      "codigo": "1028",
+      "desenho_cor": "branco",
+      "metragem": 500,
+      "preco": 13.7,
+      "subtotal": 6850
+    },
+    {
+      "artigo": "verano flame",
+      "codigo": "1001",
+      "desenho_cor": "off white",
+      "metragem": 1000,
+      "preco": 12.9,
+      "subtotal": 12900
+    }
+  ],
+  "valor_total": 28100,
+  "observacoes": "teste 3 - 3 tecidos",
+  "arquivo_gerado": "pedido_20251209_145802.json"
+}

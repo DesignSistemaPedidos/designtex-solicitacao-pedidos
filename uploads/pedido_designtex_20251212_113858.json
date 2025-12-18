@@ -1,0 +1,38 @@
+{
+  "timestamp": "12/12/2025 11:38:58",
+  "empresa": "Designtex Tecidos",
+  "dados_cabecalho": {
+    "representante": "Kleber",
+    "razao_social": "DISTRIBUIDORA 123 LTDA",
+    "cnpj": "11.222.333/0001-44",
+    "telefone": ""
+  },
+  "dados_corpo": {
+    "prazo_pagamento": "7/14/21 dias",
+    "tipo_pedido": "PE - Pronta-entrega",
+    "tipo_frete": "CIF",
+    "transportadora_fob": "",
+    "transportadora_cif": "",
+    "venda_triangular": "Não",
+    "dados_triangulacao": "",
+    "regime_ret": "",
+    "tipo_produto": "Liso"
+  },
+  "tabela_precos": {
+    "icms_normal": "ICMS 18%",
+    "icms_ld": ""
+  },
+  "produtos": [
+    {
+      "artigo": "Linho",
+      "codigo": "1002 ",
+      "desenho_cor": "760 azul maia",
+      "metragem": 1000,
+      "preco": 13.9,
+      "subtotal": 13900
+    }
+  ],
+  "valor_total": 13900,
+  "observacoes": "",
+  "arquivo_gerado": "pedido_designtex_20251212_113858.json"
+}

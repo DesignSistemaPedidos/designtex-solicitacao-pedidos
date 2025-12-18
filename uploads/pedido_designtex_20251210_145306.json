@@ -1,0 +1,46 @@
+{
+  "timestamp": "10/12/2025 14:53:06",
+  "empresa": "Designtex Tecidos",
+  "dados_cabecalho": {
+    "representante": "TESTE8",
+    "razao_social": "COMERCIAL XYZ S/A",
+    "cnpj": "98.765.432/0001-10",
+    "telefone": "(31) 99333-6786"
+  },
+  "dados_corpo": {
+    "prazo_pagamento": "84 dias",
+    "tipo_pedido": "PE - Pronta-entrega",
+    "tipo_frete": "CIF",
+    "transportadora_fob": "",
+    "transportadora_cif": "digitar cnjp da transportadora",
+    "venda_triangular": "Não",
+    "dados_triangulacao": "",
+    "regime_ret": "Não",
+    "tipo_produto": "Liso"
+  },
+  "tabela_precos": {
+    "icms_normal": "ICMS 18%",
+    "icms_ld": ""
+  },
+  "produtos": [
+    {
+      "artigo": "top line",
+      "codigo": "1028",
+      "desenho_cor": "100",
+      "metragem": 500,
+      "preco": 11.9,
+      "subtotal": 5950
+    },
+    {
+      "artigo": "chambray",
+      "codigo": "1003",
+      "desenho_cor": "1050",
+      "metragem": 100,
+      "preco": 15.9,
+      "subtotal": 1590
+    }
+  ],
+  "valor_total": 7540,
+  "observacoes": "teste8",
+  "arquivo_gerado": "pedido_designtex_20251210_145306.json"
+}

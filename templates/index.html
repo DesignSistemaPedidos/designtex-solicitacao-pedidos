@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedido de Vendas - Designtex Tecidos</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- CSS customizado -->
+    <style>
+        body {
+            background-color: #80858b;
+            font-family: 'Arial', sans-serif;
+        }
+
+        .container {
+            background-color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px auto;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            max-width: 1000px;
+        }
+
+        .header-title {
+            color: #1a5490;
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        /* Autocomplete customizado */
+        .autocomplete-container {
+            position: relative;
+        }
+
+        .autocomplete-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+
+        .autocomplete-item {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .autocomplete-item:hover {
+            background-color: #f5f5f5;
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                padding: 20px;
+            }
+
+            .header-title {
+                font-size: 22px;
+            }
+        }
+
+        .btn-primary {
+            background-color: #1a5490;
+            border-color: #1a5490;
+        }
+
+        .btn-primary:hover {
+            background-color: #134072;
+            border-color: #134072;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="header-title">PEDIDO DE VENDAS<br>DESIGNTEX TECIDOS</h1>
+
+        <form id="pedidoForm">
+            <!-- PARTE 1 - CABEÇALHO -->
+            <div class="card mb-4">
+                <div class="card-header" style="background-color: #1a5490; color: white;">
+                    <h5 class="mb-0">📋 DADOS DO CABEÇALHO</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="nomeRepresentante" class="form-label">Nome do Representante *</label>
+                            <input type="text" class="form-control" id="nomeRepresentante" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="razaoSocial" class="form-label">Razão Social do Cliente *</label>
+                            <div class="autocomplete-container">
+                                <input type="text" class="form-control" id="razaoSocial"
+                                    placeholder="Digite para buscar..." required>
+                                <div id="autocomplete-dropdown" class="autocomplete-dropdown"></div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="cnpj" class="form-label">CNPJ do Cliente *</label>
+                            <input type="text" class="form-control" id="cnpj" readonly
+                                style="background-color: #f8f9fa;">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="telefone" class="form-label">Telefone de Contato *</label>
+                            <input type="text" class="form-control" id="telefone" required>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PARTE 2 - CORPO DO PEDIDO -->
+            <div class="card mb-4">
+                <div class="card-header" style="background-color: #1a5490; color: white;">
+                    <h5 class="mb-0">⚙️ CONDIÇÕES DO PEDIDO</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="prazoPagamento" class="form-label">Prazo de Pagamento *</label>
+                            <select class="form-select" id="prazoPagamento" required>
+                                <option value="">Selecione...</option>
+                                {% for prazo in prazos %}
+                                <option value="{{ prazo }}">{{ prazo }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="tipoPedido" class="form-label">Tipo de Pedido *</label>
+                            <select class="form-select" id="tipoPedido" required>
+                                <option value="">Selecione...</option>
+                                <option value="OP">OP (Programação de pedidos)</option>
+                                <option value="PE">PE (Pronta-entrega)</option>
+                            </select>
+                        </div>
+
+                        <!-- NOVO: Campo para Número da OP -->
+                        <div id="campoNumeroOP" class="col-md-6 mb-3" style="display:none;">
+                            <label for="numeroOP" class="form-label">Número da OP *</label>
+                            <input type="text" class="form-control" id="numeroOP" placeholder="Digite o número da OP">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="tipoFrete" class="form-label">Tipo de Frete *</label>
+                            <select class="form-select" id="tipoFrete" required>
+                                <option value="">Selecione...</option>
+                                <option value="CIF">CIF</option>
+                                <option value="FOB">FOB</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="tipoProduto" class="form-label">Tipo de Produto *</label>
+                            <select class="form-select" id="tipoProduto" required>
+                                <option value="">Selecione...</option>
+                                <option value="Liso">Liso</option>
+                                <option value="Estampado">Estampado</option>
+                                <option value="Digital">Digital</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Campos condicionais de frete -->
+                    <div id="campoTransportadoraFOB" class="mb-3" style="display:none;">
+                        <label for="transportadoraFOB" class="form-label">Transportadora FOB</label>
+                        <input type="text" class="form-control" id="transportadoraFOB"
+                            placeholder="Digite os dados da transportadora FOB">
+                    </div>
+
+                    <div id="campoTransportadoraCIF" class="mb-3" style="display:none;">
+                        <label for="transportadoraCIF" class="form-label">Transportadora CIF</label>
+                        <input type="text" class="form-control" id="transportadoraCIF"
+                            placeholder="Digite os dados da transportadora CIF">
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="vendaTriangular" class="form-label">Venda Triangular *</label>
+                            <select class="form-select" id="vendaTriangular" required>
+                                <option value="Não">Não</option>
+                                <option value="Sim">Sim</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="regimeRET" class="form-label">Regime Fiscal R.E.T * (Somente MG) </label>
+                            <select class="form-select" id="regimeRET" required>
+                                <option value="Não">Não</option>
+                                <option value="Sim">Sim</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="campoTriangulacao" class="mb-3" style="display:none;">
+                        <label for="dadosTriangulacao" class="form-label">Dados da Triangulação</label>
+                        <textarea class="form-control" id="dadosTriangulacao" rows="2"
+                            placeholder="Digite os dados da triangulação"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PARTE 3 - TABELA DE PREÇOS - CORRIGIDA -->
+            <div class="card mb-4">
+                <div class="card-header" style="background-color: #1a5490; color: white;">
+                    <h5 class="mb-0">💰 TABELA DE PREÇOS</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Selecione a Tabela de Preços *</label>
+                        <div class="row">
+                            <!-- CORRIGIDO: Agora é uma seleção única -->
+                            <div class="col-md-6">
+                                <div class="border p-3 rounded">
+                                    <h6>ICMS Normal</h6>
+                                    <div>
+                                        <input type="radio" id="icms18_normal" name="tabelaPrecos" value="ICMS 18%"
+                                            required>
+                                        <label for="icms18_normal" class="form-check-label me-3">ICMS 18%</label>
+                                    </div>
+                                    <div>
+                                        <input type="radio" id="icms12_normal" name="tabelaPrecos" value="ICMS 12%"
+                                            required>
+                                        <label for="icms12_normal" class="form-check-label me-3">ICMS 12%</label>
+                                    </div>
+                                    <div>
+                                        <input type="radio" id="icms7_normal" name="tabelaPrecos" value="ICMS 7%"
+                                            required>
+                                        <label for="icms7_normal" class="form-check-label me-3">ICMS 7%</label>
+                                    </div>
+                                    <div>
+                                        <input type="radio" id="ret_normal" name="tabelaPrecos" value="RET (SOMENTE MG)"
+                                            required>
+                                        <label for="ret_normal" class="form-check-label">RET (SOMENTE MG)</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="border p-3 rounded">
+                                    <h6>ICMS LD</h6>
+                                    <div>
+                                        <input type="radio" id="icms18_ld" name="tabelaPrecos" value="ICMS 18% LD"
+                                            required>
+                                        <label for="icms18_ld" class="form-check-label me-3">ICMS 18% LD</label>
+                                    </div>
+                                    <div>
+                                        <input type="radio" id="icms12_ld" name="tabelaPrecos" value="ICMS 12% LD"
+                                            required>
+                                        <label for="icms12_ld" class="form-check-label me-3">ICMS 12% LD</label>
+                                    </div>
+                                    <div>
+                                        <input type="radio" id="icms7_ld" name="tabelaPrecos" value="ICMS 7% LD"
+                                            required>
+                                        <label for="icms7_ld" class="form-check-label me-3">ICMS 7% LD</label>
+                                    </div>
+                                    <div>
+                                        <input type="radio" id="ret_ld" name="tabelaPrecos" value="RET LD (SOMENTE MG)"
+                                            required>
+                                        <label for="ret_ld" class="form-check-label">RET LD (SOMENTE MG)</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-2">
+                            <small class="text-muted">⚠️ Selecione apenas uma opção: ICMS Normal OU ICMS LD</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PARTE 4 - PRODUTOS -->
+            <div class="card mb-4">
+                <div class="card-header" style="background-color: #1a5490; color: white;">
+                    <h5 class="mb-0">📦 PRODUTOS</h5>
+                </div>
+                <div class="card-body">
+                    <div id="produtos-container">
+                        <!-- Produtos serão adicionados aqui via JavaScript -->
+                    </div>
+
+                    <button type="button" class="btn btn-secondary mb-3" onclick="adicionarProduto()">
+                        ➕ Adicionar Produto
+                    </button>
+
+                    <div class="text-end">
+                        <h4>Total: R$ <span id="valorTotal">0,00</span></h4>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PARTE 5 - OBSERVAÇÕES -->
+            <div class="card mb-4">
+                <div class="card-header" style="background-color: #1a5490; color: white;">
+                    <h5 class="mb-0">📝 OBSERVAÇÕES</h5>
+                </div>
+                <div class="card-body">
+                    <textarea class="form-control" id="observacoes" rows="4" maxlength="500"
+                        placeholder="Observações adicionais (máximo 500 caracteres)"></textarea>
+                    <div class="form-text">
+                        <span id="contadorCaracteres">0</span>/500 caracteres
+                    </div>
+                </div>
+            </div>
+
+            <!-- BOTÕES -->
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <button type="submit" class="btn btn-primary btn-lg me-md-2">
+                    📤 Enviar Pedido
+                </button>
+                <button type="button" class="btn btn-secondary btn-lg" onclick="limparFormulario()">
+                    🗑️ Cancelar
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- EmailJS -->
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+    <script>
+        // Inicializar EmailJS
+        emailjs.init('YOUR_PUBLIC_KEY'); // Substitua pela sua chave
+
+        let contadorProdutos = 0;
+        let timeoutId;
+
+        // ========== AUTOCOMPLETE DE CLIENTES ==========
+        document.getElementById('razaoSocial').addEventListener('input', function (e) {
+            const query = e.target.value.trim();
+            const dropdown = document.getElementById('autocomplete-dropdown');
+
+            // Limpar timeout anterior
+            clearTimeout(timeoutId);
+
+            if (query.length < 1) {
+                dropdown.style.display = 'none';
+                limparDadosCliente();
+                return;
+            }
+
+            // Debounce de 300ms
+            timeoutId = setTimeout(() => {
+                buscarClientes(query);
+            }, 300);
+        });
+
+        function buscarClientes(query) {
+            fetch(`/api/buscar_clientes?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    mostrarResultados(data);
+                })
+                .catch(error => {
+                    console.error('Erro na busca:', error);
+                });
+        }
+
+        function mostrarResultados(clientes) {
+            const dropdown = document.getElementById('autocomplete-dropdown');
+            dropdown.innerHTML = '';
+
+            if (clientes.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            clientes.forEach(cliente => {
+                const item = document.createElement('div');
+                item.className = 'autocomplete-item';
+                item.innerHTML = `
+                    <strong>${cliente.razao_social}</strong><br>
+                    <small style="color: #666;">CNPJ: ${cliente.cnpj}</small>
+                `;
+
+                item.addEventListener('click', () => {
+                    selecionarCliente(cliente);
+                });
+
+                dropdown.appendChild(item);
+            });
+
+            dropdown.style.display = 'block';
+        }
+
+        function selecionarCliente(cliente) {
+            document.getElementById('razaoSocial').value = cliente.razao_social;
+            document.getElementById('cnpj').value = cliente.cnpj;
+            document.getElementById('telefone').value = cliente.telefone || '';
+            document.getElementById('autocomplete-dropdown').style.display = 'none';
+        }
+
+        function limparDadosCliente() {
+            document.getElementById('cnpj').value = '';
+            document.getElementById('telefone').value = '';
+        }
+
+        // Fechar dropdown ao clicar fora
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.autocomplete-container')) {
+                document.getElementById('autocomplete-dropdown').style.display = 'none';
+            }
+        });
+
+        // ========== CAMPOS CONDICIONAIS ==========
+        document.getElementById('tipoFrete').addEventListener('change', function () {
+            const frete = this.value;
+            const campoFOB = document.getElementById('campoTransportadoraFOB');
+            const campoCIF = document.getElementById('campoTransportadoraCIF');
+
+            if (frete === 'FOB') {
+                campoFOB.style.display = 'block';
+                campoCIF.style.display = 'none';
+            } else if (frete === 'CIF') {
+                campoCIF.style.display = 'block';
+                campoFOB.style.display = 'none';
+            } else {
+                campoFOB.style.display = 'none';
+                campoCIF.style.display = 'none';
+            }
+        });
+
+        document.getElementById('vendaTriangular').addEventListener('change', function () {
+            const triangular = this.value;
+            const campo = document.getElementById('campoTriangulacao');
+
+            if (triangular === 'Sim') {
+                campo.style.display = 'block';
+                document.getElementById('dadosTriangulacao').required = true;
+            } else {
+                campo.style.display = 'none';
+                document.getElementById('dadosTriangulacao').required = false;
+            }
+        });
+
+        // ========== PRODUTOS ==========
+        function adicionarProduto() {
+            contadorProdutos++;
+            const container = document.getElementById('produtos-container');
+
+            const produtoDiv = document.createElement('div');
+            produtoDiv.className = 'produto-item mb-4 p-3 border rounded';
+            produtoDiv.id = `produto-${contadorProdutos}`;
+
+            produtoDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Produto ${contadorProdutos}</h6>
+                    <button type="button" class="btn btn-danger btn-sm" 
+                            onclick="removerProduto(${contadorProdutos})">❌ Remover</button>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Artigo *</label>
+                        <input type="text" class="form-control" name="artigo" required>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Código do Artigo *</label>
+                        <input type="text" class="form-control" name="codigo" required>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Desenho/Cor *</label>
+                        <input type="text" class="form-control" name="desenho_cor" required>
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <label class="form-label">Metragem *</label>
+                        <input type="number" class="form-control" name="metragem" step="0.01" 
+                               required onchange="calcularSubtotal(${contadorProdutos})">
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <label class="form-label">Preço/Metro *</label>
+                        <input type="number" class="form-control" name="preco" step="0.01" 
+                               required onchange="calcularSubtotal(${contadorProdutos})">
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <label class="form-label">Subtotal</label>
+                        <input type="text" class="form-control subtotal" readonly 
+                               style="background-color: #f8f9fa;" value="R$ 0,00">
+                    </div>
+                </div>
+            `;
+
+            container.appendChild(produtoDiv);
+        }
+
+        function removerProduto(id) {
+            const produto = document.getElementById(`produto-${id}`);
+            if (produto) {
+                produto.remove();
+                calcularTotal();
+            }
+        }
+
+        function calcularSubtotal(id) {
+            const produto = document.getElementById(`produto-${id}`);
+            const metragem = parseFloat(produto.querySelector('input[name="metragem"]').value) || 0;
+            const preco = parseFloat(produto.querySelector('input[name="preco"]').value) || 0;
+            const subtotal = metragem * preco;
+
+            produto.querySelector('.subtotal').value = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
+            calcularTotal();
+        }
+
+        function calcularTotal() {
+            const produtos = document.querySelectorAll('.produto-item');
+            let total = 0;
+
+            produtos.forEach(produto => {
+                const metragem = parseFloat(produto.querySelector('input[name="metragem"]').value) || 0;
+                const preco = parseFloat(produto.querySelector('input[name="preco"]').value) || 0;
+                total += metragem * preco;
+            });
+
+            document.getElementById('valorTotal').textContent = total.toFixed(2).replace('.', ',');
+        }
+
+        // ========== CONTADOR DE CARACTERES ==========
+        document.getElementById('observacoes').addEventListener('input', function () {
+            const contador = document.getElementById('contadorCaracteres');
+            contador.textContent = this.value.length;
+        });
+
+        // ========== ENVIO DO FORMULÁRIO ==========
+        document.getElementById('pedidoForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            if (!validarFormulario()) {
+                return;
+            }
+
+            const dados = coletarDados();
+            enviarPedido(dados);
+        });
+
+        function validarFormulario() {
+            // Validar se tem pelo menos um produto
+            const produtos = document.querySelectorAll('.produto-item');
+            if (produtos.length === 0) {
+                alert('Adicione pelo menos um produto!');
+                return false;
+            }
+
+            // Validar se todos os campos obrigatórios estão preenchidos
+            const camposObrigatorios = document.querySelectorAll('[required]');
+            for (let campo of camposObrigatorios) {
+                if (!campo.value.trim()) {
+                    alert(`Campo obrigatório não preenchido: ${campo.previousElementSibling.textContent}`);
+                    campo.focus();
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        function coletarDados() {
+            const produtos = [];
+            document.querySelectorAll('.produto-item').forEach(produto => {
+                const artigo = produto.querySelector('input[name="artigo"]').value;
+                const codigo = produto.querySelector('input[name="codigo"]').value;
+                const desenho_cor = produto.querySelector('input[name="desenho_cor"]').value;
+                const metragem = parseFloat(produto.querySelector('input[name="metragem"]').value);
+                const preco = parseFloat(produto.querySelector('input[name="preco"]').value);
+
+                produtos.push({
+                    artigo,
+                    codigo,
+                    desenho_cor,
+                    metragem,
+                    preco,
+                    subtotal: metragem * preco
+                });
+            });
+
+            return {
+                nomeRepresentante: document.getElementById('nomeRepresentante').value,
+                razaoSocial: document.getElementById('razaoSocial').value,
+                cnpj: document.getElementById('cnpj').value,
+                telefone: document.getElementById('telefone').value,
+                prazoPagamento: document.getElementById('prazoPagamento').value,
+                tipoPedido: document.getElementById('tipoPedido').value,
+                tipoFrete: document.getElementById('tipoFrete').value,
+                transportadoraFOB: document.getElementById('transportadoraFOB').value,
+                transportadoraCIF: document.getElementById('transportadoraCIF').value,
+                vendaTriangular: document.getElementById('vendaTriangular').value,
+                dadosTriangulacao: document.getElementById('dadosTriangulacao').value,
+                regimeRET: document.getElementById('regimeRET').value,
+                tipoProduto: document.getElementById('tipoProduto').value,
+                icmsNormal: document.querySelector('input[name="icmsNormal"]:checked')?.value,
+                icmsLD: document.querySelector('input[name="icmsLD"]:checked')?.value,
+                produtos: produtos,
+                valorTotal: produtos.reduce((sum, p) => sum + p.subtotal, 0),
+                observacoes: document.getElementById('observacoes').value
+            };
+        }
+
+        function enviarPedido(dados) {
+            const btnEnviar = document.querySelector('button[type="submit"]');
+            btnEnviar.disabled = true;
+            btnEnviar.innerHTML = '⏳ Enviando...';
+
+            fetch('/submit_pedido', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(dados)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`✅ ${data.message}`);
+
+                        // Enviar por email (configure sua chave do EmailJS)
+                        /*
+                        emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', {
+                            to_email: 'pedido@designtextecidos.com.br',
+                            pedido_numero: data.numero_pedido,
+                            representante: dados.nomeRepresentante,
+                            cliente: dados.razaoSocial,
+                            valor_total: data.valor_total
+                        });
+                        */
+
+                        // Limpar formulário
+                        limparFormulario();
+                    } else {
+                        alert(`❌ Erro: ${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('❌ Erro ao enviar pedido. Tente novamente.');
+                })
+                .finally(() => {
+                    btnEnviar.disabled = false;
+                    btnEnviar.innerHTML = '📤 Enviar Pedido';
+                });
+        }
+
+        function limparFormulario() {
+            document.getElementById('pedidoForm').reset();
+            document.getElementById('produtos-container').innerHTML = '';
+            document.getElementById('valorTotal').textContent = '0,00';
+            document.getElementById('contadorCaracteres').textContent = '0';
+            contadorProdutos = 0;
+            limparDadosCliente();
+        }
+
+        // Adicionar primeiro produto ao carregar
+        window.addEventListener('load', function () {
+            adicionarProduto();
+        });
+        // Adicionar no final do arquivo index.html, dentro do <script>
+
+        function enviarPedido(dados) {
+            const btnEnviar = document.querySelector('button[type="submit"]');
+            btnEnviar.disabled = true;
+            btnEnviar.innerHTML = '⏳ Enviando...';
+
+            fetch('/submit_pedido', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(dados)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`✅ ${data.message}`);
+
+                        // DOWNLOAD AUTOMÁTICO DO PDF
+                        if (data.pdf_url) {
+                            console.log('Fazendo download do PDF...');
+                            const link = document.createElement('a');
+                            link.href = data.pdf_url;
+                            link.download = `Pedido_${data.numero_pedido}.pdf`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }
+
+                        // Mostrar status do email
+                        if (data.email_enviado) {
+                            alert('📧 Email enviado com sucesso para pedido@designtextecidos.com.br');
+                        } else {
+                            alert('⚠️ Email não foi enviado. Verifique as configurações.');
+                        }
+
+                        limparFormulario();
+                    } else {
+                        alert(`❌ Erro: ${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('❌ Erro ao enviar pedido. Tente novamente.');
+                })
+                .finally(() => {
+                    btnEnviar.disabled = false;
+                    btnEnviar.innerHTML = '📤 Enviar Pedido';
+                });
+        }
+        // ========== CAMPO NÚMERO DA OP ==========
+        document.getElementById('tipoPedido').addEventListener('change', function () {
+            const tipoPedido = this.value;
+            const campoNumeroOP = document.getElementById('campoNumeroOP');
+            const inputNumeroOP = document.getElementById('numeroOP');
+
+            if (tipoPedido === 'OP') {
+                campoNumeroOP.style.display = 'block';
+                inputNumeroOP.required = true;
+            } else {
+                campoNumeroOP.style.display = 'none';
+                inputNumeroOP.required = false;
+                inputNumeroOP.value = '';
+            }
+        });
+
+        // ========== VALIDAÇÃO DE ICMS ==========
+        function validarFormulario() {
+            // Validar se tem pelo menos um produto
+            const produtos = document.querySelectorAll('.produto-item');
+            if (produtos.length === 0) {
+                alert('Adicione pelo menos um produto!');
+                return false;
+            }
+
+            // Validar tabela de preços selecionada
+            const tabelaPrecos = document.querySelector('input[name="tabelaPrecos"]:checked');
+            if (!tabelaPrecos) {
+                alert('Selecione uma tabela de preços (ICMS Normal ou ICMS LD)!');
+                return false;
+            }
+
+            // Validar número da OP se necessário
+            const tipoPedido = document.getElementById('tipoPedido').value;
+            const numeroOP = document.getElementById('numeroOP').value;
+            if (tipoPedido === 'OP' && !numeroOP.trim()) {
+                alert('Número da OP é obrigatório para tipo de pedido OP!');
+                document.getElementById('numeroOP').focus();
+                return false;
+            }
+
+            // Validar se todos os campos obrigatórios estão preenchidos
+            const camposObrigatorios = document.querySelectorAll('[required]');
+            for (let campo of camposObrigatorios) {
+                if (!campo.value.trim()) {
+                    alert(`Campo obrigatório não preenchido: ${campo.labels[0]?.textContent || 'Campo obrigatório'}`);
+                    campo.focus();
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // ========== COLETAR DADOS ATUALIZADO ==========
+        function coletarDados() {
+            const produtos = [];
+            document.querySelectorAll('.produto-item').forEach(produto => {
+                const artigo = produto.querySelector('input[name="artigo"]').value;
+                const codigo = produto.querySelector('input[name="codigo"]').value;
+                const desenho_cor = produto.querySelector('input[name="desenho_cor"]').value;
+                const metragem = parseFloat(produto.querySelector('input[name="metragem"]').value);
+                const preco = parseFloat(produto.querySelector('input[name="preco"]').value);
+
+                produtos.push({
+                    artigo,
+                    codigo,
+                    desenho_cor,
+                    metragem,
+                    preco,
+                    subtotal: metragem * preco
+                });
+            });
+
+            return {
+                nomeRepresentante: document.getElementById('nomeRepresentante').value,
+                razaoSocial: document.getElementById('razaoSocial').value,
+                cnpj: document.getElementById('cnpj').value,
+                telefone: document.getElementById('telefone').value,
+                prazoPagamento: document.getElementById('prazoPagamento').value,
+                tipoPedido: document.getElementById('tipoPedido').value,
+                numeroOP: document.getElementById('numeroOP').value, // NOVO
+                tipoFrete: document.getElementById('tipoFrete').value,
+                transportadoraFOB: document.getElementById('transportadoraFOB').value,
+                transportadoraCIF: document.getElementById('transportadoraCIF').value,
+                vendaTriangular: document.getElementById('vendaTriangular').value,
+                dadosTriangulacao: document.getElementById('dadosTriangulacao').value,
+                regimeRET: document.getElementById('regimeRET').value,
+                tipoProduto: document.getElementById('tipoProduto').value,
+                tabelaPrecos: document.querySelector('input[name="tabelaPrecos"]:checked')?.value, // CORRIGIDO
+                produtos: produtos,
+                valorTotal: produtos.reduce((sum, p) => sum + p.subtotal, 0),
+                observacoes: document.getElementById('observacoes').value
+            };
+        }
+
+
+    </script>
+</body>
+
+</html>

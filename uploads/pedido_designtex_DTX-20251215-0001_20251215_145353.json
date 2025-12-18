@@ -1,0 +1,47 @@
+{
+  "numero_pedido": "DTX-20251215-0001",
+  "timestamp": "15/12/2025 14:53:53",
+  "empresa": "Designtex Tecidos",
+  "dados_cabecalho": {
+    "representante": "TESTE11",
+    "razao_social": "TÊXTIL GAMMA S/A",
+    "cnpj": "77.888.999/0001-22",
+    "telefone": "31993336786"
+  },
+  "dados_corpo": {
+    "prazo_pagamento": "À Vista",
+    "tipo_pedido": "PE",
+    "tipo_frete": "CIF",
+    "transportadora_fob": "",
+    "transportadora_cif": "CNPJ DA TRANSPORTADORA",
+    "venda_triangular": "Não",
+    "dados_triangulacao": "",
+    "regime_ret": "Não",
+    "tipo_produto": "Liso"
+  },
+  "tabela_precos": {
+    "icms_normal": "ICMS 18%",
+    "icms_ld": "ICMS 18% LD"
+  },
+  "produtos": [
+    {
+      "artigo": "LINHO DELUXE",
+      "codigo": "1002",
+      "desenho_cor": "800 MARROM ",
+      "metragem": 100,
+      "preco": 12.9,
+      "subtotal": 1290
+    },
+    {
+      "artigo": "TOP LINE",
+      "codigo": "1028",
+      "desenho_cor": "900 PRETO",
+      "metragem": 100,
+      "preco": 13.9,
+      "subtotal": 1390
+    }
+  ],
+  "valor_total": 2680.0,
+  "observacoes": "",
+  "arquivo_gerado": "pedido_designtex_DTX-20251215-0001_20251215_145353.json"
+}

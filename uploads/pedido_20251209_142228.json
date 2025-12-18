@@ -1,0 +1,25 @@
+{
+  "timestamp": "09/12/2025 14:22:28",
+  "dados_cliente": {
+    "representante": "teste2",
+    "razao_social": "EMPRESA ABC LTDA",
+    "telefone": "(31) 99333-6786",
+    "prazo_pagamento": "À vista"
+  },
+  "produtos": [
+    {
+      "produto": "Algodão 100% - Branco",
+      "quantidade": 2000,
+      "preco": 12,
+      "subtotal": 24000
+    },
+    {
+      "produto": "Algodão 100% - Azul",
+      "quantidade": 2000,
+      "preco": 12,
+      "subtotal": 24000
+    }
+  ],
+  "observacoes": "teste2. 4.000 metros",
+  "valor_total": 48000
+}

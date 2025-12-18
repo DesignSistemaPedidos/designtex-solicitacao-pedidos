@@ -1,0 +1,46 @@
+{
+  "timestamp": "10/12/2025 14:15:49",
+  "empresa": "Designtex Tecidos",
+  "dados_cabecalho": {
+    "representante": "TESTE5",
+    "razao_social": "EMPRESA ABC LTDA",
+    "cnpj": "12.345.678/0001-90",
+    "telefone": "(31) 99333-6786"
+  },
+  "dados_corpo": {
+    "prazo_pagamento": "14 dias",
+    "tipo_pedido": "PE - Pronta-entrega",
+    "tipo_frete": "CIF",
+    "transportadora_fob": "",
+    "transportadora_cif": "CNPJ DA TRANSPORTADORA",
+    "venda_triangular": "Não",
+    "dados_triangulacao": "",
+    "regime_ret": "Não",
+    "tipo_produto": "Liso"
+  },
+  "tabela_precos": {
+    "icms_normal": "ICMS 18%",
+    "icms_ld": ""
+  },
+  "produtos": [
+    {
+      "artigo": "LINHO DELUXE",
+      "codigo": "1002",
+      "desenho_cor": "760",
+      "metragem": 1000,
+      "preco": 13.9,
+      "subtotal": 13900
+    },
+    {
+      "artigo": "VERANO FLAME",
+      "codigo": "1001",
+      "desenho_cor": "100",
+      "metragem": 1000,
+      "preco": 12.9,
+      "subtotal": 12900
+    }
+  ],
+  "valor_total": 26800,
+  "observacoes": "TESTE",
+  "arquivo_gerado": "pedido_designtex_20251210_141549.json"
+}

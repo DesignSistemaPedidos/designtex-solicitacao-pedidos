@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Designtex Tecidos - Sistema de Pedidos</title>
+
+    <!-- EmailJS -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <script type="text/javascript">
+        // Inicializar EmailJS
+        (function () {
+            emailjs.init("RHQ_oCFOMWzx8v-XG");
+        })();
+    </script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #80858b;
+            /* Nova cor de fundo */
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.8rem;
+        }
+
+        h2 {
+            color: #2c3e50;
+            margin: 30px 0 20px 0;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+            font-size: 1.4rem;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+
+        /* Status EmailJS */
+        .emailjs-status {
+            background: #e8f5e8;
+            border: 1px solid #4caf50;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            margin-bottom: 30px;
+            color: #2e7d32;
+        }
+
+        /* Grids */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .form-grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+        }
+
+        .form-grid-4 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        /* Labels e inputs */
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+            font-family: inherit;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        /* Autocomplete */
+        .autocomplete-container {
+            position: relative;
+        }
+
+        .autocomplete-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            border-radius: 0 0 8px 8px;
+        }
+
+        .autocomplete-suggestion {
+            padding: 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+
+        .autocomplete-suggestion:hover {
+            background: #f8f9fa;
+        }
+
+        .autocomplete-suggestion.active {
+            background: #e3f2fd;
+        }
+
+        /* Radio buttons e checkboxes */
+        .radio-group,
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 8px;
+        }
+
+        .radio-item,
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .radio-item:hover,
+        .checkbox-item:hover {
+            background: #e3f2fd;
+            border-color: #667eea;
+        }
+
+        /* NOVA COR: Após selecionar = negrito preto */
+        .radio-item input:checked+span,
+        .checkbox-item input:checked+span {
+            font-weight: bold;
+            color: #000000;
+        }
+
+        /* Botões */
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn.small {
+            padding: 8px 16px;
+            font-size: 12px;
+        }
+
+        .btn.danger {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        }
+
+        .btn.success {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+        }
+
+        .btn.pdf {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        }
+
+        /* Produtos */
+        .produto-item {
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+        }
+
+        .produto-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 2fr 1fr 1fr auto;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .valor-total {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .valor-total h3 {
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+        }
+
+        .valor-total p {
+            opacity: 0.9;
+        }
+
+        /* Status */
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        /* Campos condicionais */
+        .campo-condicional {
+            display: none;
+            margin-top: 15px;
+        }
+
+        .campo-condicional.ativo {
+            display: block;
+        }
+
+        /* Alertas */
+        .alerta {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-size: 13px;
+        }
+
+        /* Responsivo MOBILE - Fontes menores */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            .form-grid,
+            .form-grid-3,
+            .form-grid-4 {
+                grid-template-columns: 1fr;
+            }
+
+            .produto-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .radio-group,
+            .checkbox-group {
+                flex-direction: column;
+            }
+
+            h1 {
+                font-size: 2.0rem;
+            }
+
+            /* Reduzido */
+            h2 {
+                font-size: 1.2rem;
+            }
+
+            /* Reduzido */
+            label {
+                font-size: 12px;
+            }
+
+            /* Reduzido */
+            input,
+            select,
+            textarea {
+                font-size: 12px;
+                padding: 10px;
+            }
+
+            /* Reduzido */
+            .btn {
+                font-size: 12px;
+                padding: 10px 20px;
+            }
+
+            /* Reduzido */
+            .radio-item,
+            .checkbox-item {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            /* Reduzido */
+            .alerta {
+                font-size: 11px;
+            }
+
+            /* Reduzido */
+            .subtitle {
+                font-size: 1rem;
+            }
+
+            /* Reduzido */
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>🏭 Designtex Tecidos</h1>
+            <p class="subtitle">Sistema de Pedidos com EmailJS + PDF</p>
+
+            <div class="emailjs-status">
+                ✅ <strong>Email configurado:</strong> Outlook via EmailJS → PDF em anexo
+            </div>
+
+            <form id="pedidoForm">
+                <h2>👤 PARTE 1 - CABEÇALHO</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>A - Nome do Representante *</label>
+                        <input type="text" id="nomeRepresentante" required placeholder="Digite seu nome completo">
+                    </div>
+
+                    <!-- CNPJ AGORA VEM PRIMEIRO -->
+                    <div class="form-group">
+                        <label>B - CNPJ do Cliente *</label>
+                        <div class="autocomplete-container">
+                            <input type="text" id="cnpj" required placeholder="Digite o CNPJ..."
+                                onkeyup="buscarCNPJ(this.value)" autocomplete="off">
+                            <div id="cnpj-suggestions" class="autocomplete-suggestions"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>C - Razão Social do Cliente *</label>
+                        <input type="text" id="razaoSocial" required readonly
+                            placeholder="Será preenchido após selecionar CNPJ">
+                    </div>
+
+                    <div class="form-group">
+                        <label>D - Telefone de Contato</label>
+                        <input type="tel" id="telefone" placeholder="(11) 99999-9999">
+                    </div>
+                </div>
+
+                <!-- PARTE 2 - CORPO -->
+                <h2>📋 PARTE 2 - CORPO</h2>
+
+                <div class="form-group">
+                    <label>A - Prazo de Pagamento *</label>
+                    <select name="prazoPagamento" required>
+                        <option value="" disabled selected>Selecione o prazo de pagamento</option>
+                        <option value="À vista">À vista</option>
+                        <option value="7 dias">7 dias</option>
+                        <option value="14 dias">14 dias</option>
+                        <option value="21 dias">21 dias</option>
+                        <option value="28 dias">28 dias</option>
+                        <option value="56 dias">56 dias</option>
+                        <option value="84 dias">84 dias</option>
+                        <option value="56/84">56/84 dias</option>
+                        <option value="56/84/112 dias">56/84/112 dias</option>
+                        <option value="7/14/21 dias">7/14/21 dias</option>
+                        <option value="21/28/35 dias">21/28/35 dias</option>
+                        <option value="35/42/49 dias">35/42/49 dias</option>
+                        <option value="49/56/63 dias">49/56/63 dias</option>
+                        <option value="42/49/56/63/70 dias">42/49/56/63/70 dias</option>
+                        <option value="56/63/70/77/84 dias">56/63/70/77/84 dias</option>
+                        <option value="84/112/140 dias">84/112/140 dias</option>
+                        <option value="56/70/84/98/112 dias">56/70/84/98/112 dias</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>B - Tipo de Pedido</label>
+                    <select name="tipoPedido" required>
+                        <option value="" disabled selected>Selecione o tipo de pedido</option>
+                        <option value="OP - Programação de pedidos">OP - Programação de pedidos</option>
+                        <option value="PE - Pronta-entrega">PE - Pronta-entrega</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>C - Tipo de Frete</label>
+                    <select name="tipoFrete" required onchange="controlarFrete()">
+                        <option value="" disabled selected>Selecione o tipo de frete</option>
+                        <option value="CIF">CIF</option>
+                        <option value="FOB">FOB</option>
+                    </select>
+                </div>
+
+                <div class="alerta">
+                    💡 <strong>Atenção:</strong> CIF será selecionado automaticamente se o pedido for superior a R$
+                    5.000,00
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>D - CNPJ e Nome da transportadora FOB</label>
+                        <input type="text" id="transportadoraFOB" placeholder="CNPJ e Nome da transportadora FOB">
+                        <div id="campoFOB" class="campo-condicional">
+                            <small>Campo habilitado para frete FOB</small>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>E - Transportadora (CIF)</label>
+                        <input type="text" id="transportadoraCIF" placeholder="Dados da transportadora para CIF">
+                        <div id="campoCIF" class="campo-condicional">
+                            <small>Campo habilitado para frete CIF</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>F - Venda Triangular</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="radio" name="vendaTriangular" value="Sim" id="triangularSim"
+                                onchange="controlarTriangular()">
+                            <span>Sim</span>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="radio" name="vendaTriangular" value="Não" id="triangularNao"
+                                onchange="controlarTriangular()">
+                            <span>Não</span>
+                        </div>
+                    </div>
+
+                    <div id="dadosTriangulacao" class="campo-condicional">
+                        <label>G - Dados da Triangulação</label>
+                        <textarea id="dadosTriangulacaoTexto" rows="3"
+                            placeholder="Digite os dados da triangulação..."></textarea>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>H - Regime Fiscal RET (Somente Minas Gerais)</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="radio" name="regimeRET" value="Sim" id="retSim">
+                            <span>Sim</span>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="radio" name="regimeRET" value="Não" id="retNao">
+                            <span>Não</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>I - Tipo de Produto</label>
+                    <select name="tipoProduto" required>
+                        <option value="" disabled selected>Selecione o tipo de produto</option>
+                        <option value="Liso">Liso</option>
+                        <option value="Estampado">Estampado</option>
+                        <option value="Digital">Digital</option>
+                    </select>
+                </div>
+
+                <!-- PARTE 3 - TABELA DE PREÇOS -->
+                <h2>💰 PARTE 3 - TABELA DE PREÇOS</h2>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>A - ICMS Normal</label>
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="icmsNormal" value="ICMS 18%" id="icms18">
+                                <span>ICMS 18%</span>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="icmsNormal" value="ICMS 12%" id="icms12">
+                                <span>ICMS 12%</span>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="icmsNormal" value="ICMS 7%" id="icms7">
+                                <span>ICMS 7%</span>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="icmsNormal" value="RET" id="icmsRET">
+                                <span>RET</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>B - ICMS LD (Lista Diferenciada)</label>
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" name="icmsLD" value="ICMS 18% LD" id="icms18LD">
+                                <span>ICMS 18% LD</span>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="icmsLD" value="ICMS 12% LD" id="icms12LD">
+                                <span>ICMS 12% LD</span>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="icmsLD" value="ICMS 7% LD" id="icms7LD">
+                                <span>ICMS 7% LD</span>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" name="icmsLD" value="RET LD" id="icmsRETLD">
+                                <span>RET LD</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PARTE 4 - DESCRIÇÃO DO PEDIDO -->
+                <h2>🛍️ PARTE 4 - DESCRIÇÃO DO PEDIDO</h2>
+
+                <div class="alerta">
+                    💡 <strong>Condição de preços:</strong> Serão aceitos preços até 10% abaixo da tabela.
+                    Exemplo: 10% abaixo, 9% abaixo, 8% abaixo, etc.
+                </div>
+
+                <div id="produtos-container">
+                    <!-- Produtos serão adicionados aqui -->
+                </div>
+
+                <button type="button" class="btn" onclick="adicionarProduto()">
+                    ➕ Adicionar Artigo
+                </button>
+
+                <div class="valor-total" id="valorTotalDiv" style="display: none;">
+                    <h3>💰 VALOR TOTAL: R$ <span id="valorTotal">0,00</span></h3>
+                    <p>Total do pedido calculado automaticamente</p>
+                </div>
+
+                <!-- PARTE 5 - OBSERVAÇÕES -->
+                <h2>📝 PARTE 5 - OBSERVAÇÕES</h2>
+
+                <div class="form-group">
+                    <label>Observações Adicionais (máximo 500 caracteres)</label>
+                    <textarea id="observacoes" rows="4" maxlength="500"
+                        placeholder="Informações adicionais sobre o pedido..." onkeyup="contarCaracteres()"></textarea>
+                    <small id="contadorCaracteres">0/500 caracteres</small>
+                </div>
+
+                <!-- PARTE 6 - BOTÕES -->
+                <h2>📤 PARTE 6 - ENVIO</h2>
+
+                <div class="form-grid">
+                    <button type="submit" class="btn success" id="submitBtn" style="padding: 20px; font-size: 18px;">
+                        📧 Enviar Pedido + PDF
+                    </button>
+
+                    <button type="button" class="btn danger" onclick="cancelarPedido()"
+                        style="padding: 20px; font-size: 18px;">
+                        ❌ Cancelar
+                    </button>
+                </div>
+            </form>
+
+            <div class="status" id="statusMessage"></div>
+
+            <!-- Botão PDF aparece após envio -->
+            <div id="botaoPDF" style="display: none; text-align: center; margin-top: 20px;">
+                <button type="button" class="btn pdf" onclick="gerarPDF()" style="padding: 15px 30px; font-size: 16px;">
+                    📄 Baixar PDF Local
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURAÇÃO EMAILJS
+        const EMAILJS_CONFIG = {
+            serviceId: 'Dtx@2025',
+            templateId: 'template_v6zh22o'
+        };
+
+        // Dados dos clientes - CNPJ como chave
+        const clientesCNPJ = {{ clientes | tojson }};
+        const clientesNomes = {{ clientes_nomes | tojson }};
+        let contadorProdutos = 0;
+        let arquivoPedido = '';
+
+        // Buscar CNPJ com autocomplete
+        function buscarCNPJ(value) {
+            const suggestions = document.getElementById('cnpj-suggestions');
+
+            if (value.length < 2) {
+                suggestions.style.display = 'none';
+                return;
+            }
+
+            const matches = Object.keys(clientesCNPJ).filter(cnpj =>
+                cnpj.includes(value) || clientesNomes[cnpj].toLowerCase().includes(value.toLowerCase())
+            );
+
+            if (matches.length > 0) {
+                suggestions.innerHTML = matches.map(cnpj =>
+                    `<div class="autocomplete-suggestion" onclick="selecionarCNPJ('${cnpj}')">
+                        <strong>${cnpj}</strong><br>
+                        <small>${clientesNomes[cnpj]}</small>
+                    </div>`
+                ).join('');
+                suggestions.style.display = 'block';
+            } else {
+                suggestions.style.display = 'none';
+            }
+        }
+
+        // Selecionar CNPJ e preencher razão social
+        function selecionarCNPJ(cnpj) {
+            document.getElementById('cnpj').value = cnpj;
+            document.getElementById('razaoSocial').value = clientesCNPJ[cnpj];
+            document.getElementById('cnpj-suggestions').style.display = 'none';
+        }
+
+        // Função para enviar email com PDF via EmailJS
+        async function enviarEmailJS(dadosPedido) {
+            try {
+                console.log('Preparando email Designtex com PDF...');
+
+                // Gerar PDF base64 para anexar
+                const pdfBlob = await gerarPDFBlob(dadosPedido);
+                const pdfBase64 = await blobToBase64(pdfBlob);
+
+                // Formatar produtos para o email
+                const produtosFormatados = dadosPedido.produtos.map(p =>
+                    `• ${p.artigo} (Código: ${p.codigo})
+  ${p.desenho_cor} - ${p.metragem}m
+  R$ ${p.preco.toFixed(2).replace('.', ',')}/m = R$ ${p.subtotal.toFixed(2).replace('.', ',')}`
+                ).join('\n\n');
+
+                // Parâmetros do template
+                const templateParams = {
+                    representante: dadosPedido.nomeRepresentante,
+                    cliente: dadosPedido.razaoSocial,
+                    cnpj: dadosPedido.cnpj,
+                    telefone: dadosPedido.telefone || 'Não informado',
+                    prazo: dadosPedido.prazoPagamento || 'Não selecionado',
+                    tipo_pedido: dadosPedido.tipoPedido || 'Não selecionado',
+                    tipo_frete: dadosPedido.tipoFrete || 'Não selecionado',
+                    venda_triangular: dadosPedido.vendaTriangular || 'Não informado',
+                    regime_ret: dadosPedido.regimeRET || 'Não informado',
+                    tipo_produto: dadosPedido.tipoProduto || 'Não selecionado',
+                    icms_normal: dadosPedido.icmsNormal || 'Não selecionado',
+                    icms_ld: dadosPedido.icmsLD || 'Não selecionado',
+                    produtos: produtosFormatados || 'Nenhum produto adicionado',
+                    valor_total: `R$ ${dadosPedido.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+                    observacoes: dadosPedido.observacoes || 'Nenhuma observação adicional',
+                    timestamp: new Date().toLocaleString('pt-BR'),
+                    email_representante: 'sistema@designtextecidos.com.br',
+                    pdf_attachment: pdfBase64
+                };
+
+                const response = await emailjs.send(
+                    EMAILJS_CONFIG.serviceId,
+                    EMAILJS_CONFIG.templateId,
+                    templateParams
+                );
+
+                console.log('Email com PDF enviado com sucesso:', response);
+                return { success: true, message: '📧 Email enviado com PDF em anexo para Designtex Tecidos!' };
+
+            } catch (error) {
+                console.error('Erro ao enviar email:', error);
+                return {
+                    success: false,
+                    message: `❌ Erro ao enviar email: ${error.message || error.text}`
+                };
+            }
+        }
+
+        // Converter blob para base64
+        function blobToBase64(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        // Gerar PDF como blob (simulado - você precisará implementar uma biblioteca de PDF)
+        async function gerarPDFBlob(dadosPedido) {
+            // Por enquanto, vamos usar o PDF do servidor
+            const response = await fetch(`/gerar_pdf/${arquivoPedido}`);
+            return await response.blob();
+        }
+
+        function controlarFrete() {
+            const tipoFrete = document.querySelector('select[name="tipoFrete"]').value;
+            document.getElementById('campoCIF').classList.toggle('ativo', tipoFrete === 'CIF');
+            document.getElementById('transportadoraCIF').disabled = tipoFrete === 'CIF';
+        }
+
+        function controlarTriangular() {
+            const isTriangular = document.getElementById('triangularSim').checked;
+            document.getElementById('dadosTriangulacao').classList.toggle('ativo', isTriangular);
+        }
+
+        function adicionarProduto() {
+            contadorProdutos++;
+            const container = document.getElementById('produtos-container');
+
+            const produtoHtml = `
+                <div class="produto-item" id="produto-${contadorProdutos}">
+                    <h4 style="margin-bottom: 15px; color: #2c3e50;">📦 Artigo ${contadorProdutos}</h4>
+                    <div class="produto-grid">
+                        <div>
+                            <label>A - Artigo *</label>
+                            <input type="text" class="produto-artigo" placeholder="Ex: Linho Deluxe" required>
+                        </div>
+                        <div>
+                            <label>B - Código do Artigo *</label>
+                            <input type="text" class="produto-codigo" placeholder="Ex: 1002" required>
+                        </div>
+                        <div>
+                            <label>C - Desenho/Cor *</label>
+                            <input type="text" class="produto-desenho" placeholder="Ex: 760 Azul Maya" required>
+                        </div>
+                        <div>
+                            <label>D - Metragem *</label>
+                            <input type="number" class="produto-metragem" min="1" placeholder="500" onchange="calcularTotal()" required>
+                        </div>
+                        <div>
+                            <label>E - Preço por Metro (R$) *</label>
+                            <input type="number" class="produto-preco" min="0" step="0.01" placeholder="16,70" onchange="calcularTotal()" required>
+                        </div>
+                        <div>
+                            <label>&nbsp;</label>
+                            <button type="button" class="btn danger small" onclick="removerProduto(${contadorProdutos})">
+                                🗑️ Remover
+                            </button>
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px; font-weight: bold; color: #27ae60;">
+                        Subtotal: R$ <span class="subtotal">0,00</span>
+                    </div>
+                </div>
+            `;
+
+            container.insertAdjacentHTML('beforeend', produtoHtml);
+            calcularTotal();
+        }
+
+        function removerProduto(id) {
+            const elemento = document.getElementById(`produto-${id}`);
+            if (elemento) {
+                elemento.remove();
+                calcularTotal();
+            }
+        }
+
+        function calcularTotal() {
+            const produtos = document.querySelectorAll('.produto-item');
+            let total = 0;
+
+            produtos.forEach(produto => {
+                const metragem = parseFloat(produto.querySelector('.produto-metragem').value) || 0;
+                const preco = parseFloat(produto.querySelector('.produto-preco').value) || 0;
+                const subtotal = metragem * preco;
+
+                produto.querySelector('.subtotal').textContent = subtotal.toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+
+                total += subtotal;
+            });
+
+            document.getElementById('valorTotal').textContent = total.toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+
+            const valorDiv = document.getElementById('valorTotalDiv');
+            valorDiv.style.display = total > 0 ? 'block' : 'none';
+
+            if (total > 5000) {
+                document.querySelector('select[name="tipoFrete"]').value = 'CIF';
+                document.getElementById('transportadoraCIF').disabled = true;
+            } else {
+                document.getElementById('transportadoraCIF').disabled = false;
+            }
+        }
+
+        function contarCaracteres() {
+            const textarea = document.getElementById('observacoes');
+            const contador = document.getElementById('contadorCaracteres');
+            contador.textContent = `${textarea.value.length}/500 caracteres`;
+        }
+
+        function cancelarPedido() {
+            if (confirm('Tem certeza que deseja cancelar o pedido? Todos os dados serão perdidos.')) {
+                document.getElementById('pedidoForm').reset();
+                document.getElementById('produtos-container').innerHTML = '';
+                contadorProdutos = 0;
+                adicionarProduto();
+                document.getElementById('statusMessage').style.display = 'none';
+                document.getElementById('botaoPDF').style.display = 'none';
+            }
+        }
+
+        function gerarPDF() {
+            if (arquivoPedido) {
+                window.open(`/gerar_pdf/${arquivoPedido}`, '_blank');
+            }
+        }
+
+        // Formatação do telefone
+        document.getElementById('telefone').addEventListener('input', function (e) {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length >= 11) {
+                value = value.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+            } else if (value.length >= 7) {
+                value = value.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3');
+            } else if (value.length >= 3) {
+                value = value.replace(/(\d{2})(\d{0,5})/, '($1) $2');
+            }
+            e.target.value = value;
+        });
+
+        // Fechar sugestões ao clicar fora
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.autocomplete-container')) {
+                document.getElementById('cnpj-suggestions').style.display = 'none';
+            }
+        });
+
+        // Envio do formulário (continua igual...)
+        document.getElementById('pedidoForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const statusDiv = document.getElementById('statusMessage');
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = '📧 Enviando PDF...';
+
+            // Coletar dados
+            const produtos = [];
+            document.querySelectorAll('.produto-item').forEach(item => {
+                const artigo = item.querySelector('.produto-artigo').value;
+                const codigo = item.querySelector('.produto-codigo').value;
+                const desenho = item.querySelector('.produto-desenho').value;
+                const metragem = item.querySelector('.produto-metragem').value;
+                const preco = item.querySelector('.produto-preco').value;
+
+                if (artigo && codigo && desenho && metragem && preco) {
+                    produtos.push({
+                        artigo: artigo,
+                        codigo: codigo,
+                        desenho_cor: desenho,
+                        metragem: parseInt(metragem),
+                        preco: parseFloat(preco),
+                        subtotal: parseInt(metragem) * parseFloat(preco)
+                    });
+                }
+            });
+
+            const valorTotal = produtos.reduce((sum, item) => sum + item.subtotal, 0);
+
+            const dados = {
+                nomeRepresentante: document.getElementById('nomeRepresentante').value,
+                razaoSocial: document.getElementById('razaoSocial').value,
+                cnpj: document.getElementById('cnpj').value,
+                telefone: document.getElementById('telefone').value,
+                prazoPagamento: document.querySelector('select[name="prazoPagamento"]').value || '',
+                tipoPedido: document.querySelector('select[name="tipoPedido"]').value || '',
+                tipoFrete: document.querySelector('select[name="tipoFrete"]').value || '',
+                transportadoraFOB: document.getElementById('transportadoraFOB').value,
+                transportadoraCIF: document.getElementById('transportadoraCIF').value,
+                vendaTriangular: document.querySelector('input[name="vendaTriangular"]:checked')?.value || '',
+                dadosTriangulacao: document.getElementById('dadosTriangulacaoTexto').value,
+                regimeRET: document.querySelector('input[name="regimeRET"]:checked')?.value || '',
+                tipoProduto: document.querySelector('select[name="tipoProduto"]').value || '',
+                icmsNormal: document.querySelector('input[name="icmsNormal"]:checked')?.value || '',
+                icmsLD: document.querySelector('input[name="icmsLD"]:checked')?.value || '',
+                produtos: produtos,
+                valorTotal: valorTotal,
+                observacoes: document.getElementById('observacoes').value
+            };
+
+            try {
+                const responseFlask = await fetch('/submit_pedido', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+
+                const resultFlask = await responseFlask.json();
+
+                if (resultFlask.success) {
+                    arquivoPedido = resultFlask.arquivo;
+
+                    const resultEmail = await enviarEmailJS(dados);
+
+                    statusDiv.style.display = 'block';
+                    if (resultEmail.success) {
+                        statusDiv.className = 'status success';
+                        statusDiv.innerHTML = `
+                            ✅ <strong>PEDIDO DESIGNTEX ENVIADO COM PDF!</strong><br>
+                            ${resultEmail.message}<br>
+                            📄 Arquivo: ${resultFlask.arquivo}<br>
+                            💰 Valor: R$ ${resultFlask.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        `;
+                        document.getElementById('botaoPDF').style.display = 'block';
+                    } else {
+                        statusDiv.className = 'status error';
+                        statusDiv.innerHTML = `
+                            ⚠️ <strong>Pedido salvo, mas erro no email:</strong><br>
+                            ${resultEmail.message}<br>
+                            📄 Arquivo: ${resultFlask.arquivo}
+                        `;
+                        document.getElementById('botaoPDF').style.display = 'block';
+                    }
+
+                    setTimeout(() => {
+                        if (confirm('Pedido processado! Novo pedido?')) {
+                            cancelarPedido();
+                        }
+                    }, 3000);
+
+                } else {
+                    statusDiv.style.display = 'block';
+                    statusDiv.className = 'status error';
+                    statusDiv.innerHTML = '❌ Erro:*

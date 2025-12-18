@@ -1,0 +1,52 @@
+import http.server
+import socketserver
+import webbrowser
+import os
+
+PORT = 8000
+
+# HTML simples para teste
+html = """<!DOCTYPE html>
+<html>
+<head>
+    <title>DTX - Teste de Conexão</title>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial; text-align: center; background: #f0f2f5; padding: 50px; }
+        .card { background: white; padding: 30px; border-radius: 10px; max-width: 600px; margin: 0 auto; }
+        h1 { color: #2c3e50; }
+        .btn { background: #3498db; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🛒 DTX Vendas</h1>
+        <h2>✅ Servidor funcionando!</h2>
+        <p>Teste de conexão realizado com sucesso</p>
+        <p><strong>Porta:</strong> 8000</p>
+        <p><strong>Status:</strong> Operacional</p>
+        <button class="btn" onclick="alert('Sistema DTX funcionando!')">Teste OK</button>
+    </div>
+</body>
+</html>"""
+
+# Salvar HTML
+with open('teste.html', 'w', encoding='utf-8') as f:
+    f.write(html)
+
+print("🚀 Servidor teste iniciando na porta 8000...")
+print("🌐 Acesse: http://localhost:8000/teste.html")
+
+class MyHandler(http.server.SimpleHTTPRequestHandler):
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-cache')
+        super().end_headers()
+
+try:
+    with socketserver.TCPServer(("", PORT), MyHandler) as httpd:
+        webbrowser.open(f'http://localhost:{PORT}/teste.html')
+        httpd.serve_forever()
+except KeyboardInterrupt:
+    print("\n🛑 Servidor parado")
+except Exception as e:
+    print(f"❌ Erro: {e}")

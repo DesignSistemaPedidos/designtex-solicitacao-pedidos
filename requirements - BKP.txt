@@ -1,0 +1,6 @@
+Flask==2.3.3
+reportlab==4.0.4
+Werkzeug==2.3.7
+python-decouple==3.8
+smtplib
+email

@@ -1,0 +1,39 @@
+{
+  "numero_pedido": "DTX-20251215-0003",
+  "timestamp": "15/12/2025 16:03:23",
+  "empresa": "Designtex Tecidos",
+  "dados_cabecalho": {
+    "representante": "teste13",
+    "razao_social": "DISTRIBUIDORA 123 LTDA",
+    "cnpj": "11.222.333/0001-44",
+    "telefone": "31993336786"
+  },
+  "dados_corpo": {
+    "prazo_pagamento": "7 dias",
+    "tipo_pedido": "OP",
+    "numero_op": "10.201",
+    "tipo_frete": "FOB",
+    "transportadora_fob": "tranportadora fob teste3",
+    "transportadora_cif": "",
+    "venda_triangular": "Não",
+    "dados_triangulacao": "",
+    "regime_ret": "Não",
+    "tipo_produto": "Liso"
+  },
+  "tabela_precos": {
+    "tipo_tabela": "ICMS 18%"
+  },
+  "produtos": [
+    {
+      "artigo": "LINHO DELUXE",
+      "codigo": "1002",
+      "desenho_cor": "200 - AMARELO",
+      "metragem": 1000,
+      "preco": 19.9,
+      "subtotal": 19900
+    }
+  ],
+  "valor_total": 19900.0,
+  "observacoes": "teste",
+  "arquivo_gerado": "pedido_designtex_DTX-20251215-0003_20251215_160323.json"
+}

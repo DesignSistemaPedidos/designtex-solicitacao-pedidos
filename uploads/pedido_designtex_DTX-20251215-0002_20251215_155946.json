@@ -1,0 +1,55 @@
+{
+  "numero_pedido": "DTX-20251215-0002",
+  "timestamp": "15/12/2025 15:59:46",
+  "empresa": "Designtex Tecidos",
+  "dados_cabecalho": {
+    "representante": "TESTE12",
+    "razao_social": "DISTRIBUIDORA 123 LTDA",
+    "cnpj": "11.222.333/0001-44",
+    "telefone": "31993336786"
+  },
+  "dados_corpo": {
+    "prazo_pagamento": "À Vista",
+    "tipo_pedido": "OP",
+    "numero_op": "10.200",
+    "tipo_frete": "CIF",
+    "transportadora_fob": "",
+    "transportadora_cif": "CNPJ DA TRANSPORTADORA",
+    "venda_triangular": "Não",
+    "dados_triangulacao": "",
+    "regime_ret": "Sim",
+    "tipo_produto": "Liso"
+  },
+  "tabela_precos": {
+    "tipo_tabela": "ICMS 18%"
+  },
+  "produtos": [
+    {
+      "artigo": "VERANO CHAMBRAY",
+      "codigo": "1008",
+      "desenho_cor": "1015",
+      "metragem": 200,
+      "preco": 15.9,
+      "subtotal": 3180
+    },
+    {
+      "artigo": "LINHO DELUXE",
+      "codigo": "1002",
+      "desenho_cor": "960 MARINHO",
+      "metragem": 200,
+      "preco": 13.9,
+      "subtotal": 2780
+    },
+    {
+      "artigo": "TOP LINE",
+      "codigo": "1028",
+      "desenho_cor": "1016 MAMELADE",
+      "metragem": 500,
+      "preco": 15.9,
+      "subtotal": 7950
+    }
+  ],
+  "valor_total": 13910.0,
+  "observacoes": "PREÇO DA TOP LINE NEGOCIADO COM O GILBERTO.",
+  "arquivo_gerado": "pedido_designtex_DTX-20251215-0002_20251215_155946.json"
+}

@@ -1,0 +1,55 @@
+{
+  "numero_pedido": "DTX-20251216-0001",
+  "timestamp": "16/12/2025 13:20:45",
+  "empresa": "Designtex Tecidos",
+  "dados_cabecalho": {
+    "representante": "TESTE13",
+    "razao_social": "TÊXTIL GAMMA S/A",
+    "cnpj": "77.888.999/0001-22",
+    "telefone": "31993336786"
+  },
+  "dados_corpo": {
+    "prazo_pagamento": "À Vista",
+    "tipo_pedido": "OP",
+    "numero_op": "10.201",
+    "tipo_frete": "CIF",
+    "transportadora_fob": "",
+    "transportadora_cif": "CNPJ DA TRANSPORTADORA",
+    "venda_triangular": "Não",
+    "dados_triangulacao": "",
+    "regime_ret": "Sim",
+    "tipo_produto": "Liso"
+  },
+  "tabela_precos": {
+    "tipo_tabela": "RET (SOMENTE MG)"
+  },
+  "produtos": [
+    {
+      "artigo": "LINHO DELUXE",
+      "codigo": "1002",
+      "desenho_cor": "100 BRANCO",
+      "metragem": 100,
+      "preco": 12.9,
+      "subtotal": 1290
+    },
+    {
+      "artigo": "LINHO DELUXE",
+      "codigo": "1002",
+      "desenho_cor": "200 AMARELO",
+      "metragem": 100,
+      "preco": 12.9,
+      "subtotal": 1290
+    },
+    {
+      "artigo": "LINHO DELUXE",
+      "codigo": "1002",
+      "desenho_cor": "300 LARANJA",
+      "metragem": 100,
+      "preco": 12.9,
+      "subtotal": 1290
+    }
+  ],
+  "valor_total": 3870.0,
+  "observacoes": "TESTE 13",
+  "arquivo_gerado": "pedido_designtex_DTX-20251216-0001_20251216_132045.json"
+}
