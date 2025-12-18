@@ -424,580 +424,440 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    """Página inicial"""
+    """Página inicial com sistema completo"""
     return render_template_string('''
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DESIGNTEX TECIDOS - Sistema Online</title>
+    <title>DESIGNTEX TECIDOS - Sistema de Pedidos</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+        }
+        .navbar {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: center;
-            padding: 20px;
         }
-        .container {
-            background: white;
-            padding: 50px;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 600px;
-            width: 100%;
+        .navbar h1 {
+            color: white;
+            font-size: 1.5em;
         }
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 3em;
-        }
-        .subtitle {
-            color: #666;
-            margin-bottom: 40px;
-            font-size: 1.2em;
-        }
-        .status {
-            background: #e8f5e8;
-            color: #2d5f2d;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 30px 0;
-            font-weight: bold;
-            font-size: 1.1em;
+        .navbar .buttons {
+            display: flex;
+            gap: 10px;
         }
         .btn {
-            display: inline-block;
-            background: #667eea;
+            background: rgba(255,255,255,0.2);
             color: white;
-            padding: 15px 35px;
-            text-decoration: none;
-            border-radius: 25px;
-            margin: 15px;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
             transition: all 0.3s ease;
-            font-weight: bold;
-            font-size: 1.1em;
+            text-decoration: none;
+            display: inline-block;
         }
         .btn:hover {
-            background: #5a6fd8;
-            transform: translateY(-3px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
         }
-        .btn-primary {
-            background: #28a745;
-            font-size: 1.2em;
-            padding: 18px 40px;
+        .btn.primary {
+            background: #ff6b6b;
         }
-        .btn-primary:hover {
-            background: #218838;
-        }
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 30px;
-            margin: 40px 0;
-        }
-        .feature {
-            background: #f8f9ff;
-            padding: 25px;
-            border-radius: 15px;
-            text-align: center;
-        }
-        .feature h3 {
-            color: #667eea;
-            margin-bottom: 15px;
-            font-size: 1.3em;
-        }
-        .feature p {
-            color: #666;
-            line-height: 1.6;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🏭 DESIGNTEX TECIDOS</h1>
-        <p class="subtitle">Sistema de Pedidos Online - Versão Railway</p>
-        
-        <div class="status">
-            🌐 ✅ Sistema Online - Railway PostgreSQL Conectado
-        </div>
-        
-        <a href="/interface" class="btn btn-primary">🛒 CRIAR PEDIDO ONLINE</a>
-        
-        <div class="features">
-            <div class="feature">
-                <h3>🔍 Monitoramento</h3>
-                <p>Health check e status em tempo real</p>
-                <a href="/health" class="btn">Ver Status</a>
-            </div>
-            
-            <div class="feature">
-                <h3>👥 Clientes</h3>
-                <p>Gestão completa de clientes</p>
-                <a href="/clientes" class="btn">Ver Clientes</a>
-            </div>
-            
-            <div class="feature">
-                <h3>💰 Preços</h3>
-                <p>Tabela de preços atualizada</p>
-                <a href="/precos" class="btn">Ver Preços</a>
-            </div>
-        </div>
-        
-        <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #eee;">
-            <h3 style="color: #667eea; margin-bottom: 15px;">🔗 APIs Disponíveis</h3>
-            <p style="color: #666; margin-bottom: 20px;">Endpoints para integração com Power BI e outros sistemas:</p>
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; text-align: left;">
-                <code style="display: block; margin: 5px 0;"><strong>GET</strong> /health - Status do sistema</code>
-                <code style="display: block; margin: 5px 0;"><strong>GET</strong> /clientes - Lista de clientes</code>
-                <code style="display: block; margin: 5px 0;"><strong>GET</strong> /precos - Tabela de preços</code>
-                <code style="display: block; margin: 5px 0;"><strong>POST</strong> /pedidos - Criar pedido</code>
-                <code style="display: block; margin: 5px 0;"><strong>GET</strong> /interface - Interface web</code>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
-    ''')
-
-
-@app.route('/interface')
-def interface_pedidos():
-    """Interface web para criar pedidos"""
-    return render_template_string('''
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DESIGNTEX TECIDOS - Emissão de Pedidos</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+        .btn.primary:hover {
+            background: #ff5252;
         }
         .container {
-            max-width: 1000px;
-            margin: 0 auto;
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        .card {
             background: white;
             border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
         }
-        .header {
-            background: #667eea;
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }
-        .header p {
-            font-size: 1.1em;
-            opacity: 0.9;
-        }
-        .form-section {
-            padding: 40px;
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
         }
         .form-group {
-            margin-bottom: 25px;
+            margin-bottom: 1rem;
         }
         .form-group label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 0.5rem;
             font-weight: bold;
             color: #333;
         }
         .form-group input, .form-group select, .form-group textarea {
             width: 100%;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s;
+            padding: 0.75rem;
+            border: 2px solid #e1e1e1;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
         }
         .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            border-color: #667eea;
             outline: none;
+            border-color: #667eea;
         }
-        .form-row {
+        .item-row {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            grid-template-columns: 2fr 1fr 1fr 1fr auto;
+            gap: 1rem;
+            align-items: end;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: #f8f9ff;
+            border-radius: 10px;
         }
-        .btn {
-            background: #667eea;
+        .btn-remove {
+            background: #ff4757;
             color: white;
             border: none;
-            padding: 15px 30px;
+            padding: 0.75rem;
             border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
             cursor: pointer;
-            transition: all 0.3s;
         }
-        .btn:hover {
-            background: #5a6fd8;
-            transform: translateY(-2px);
-        }
-        .btn-success {
-            background: #28a745;
-        }
-        .btn-success:hover {
-            background: #218838;
-        }
-        .status {
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
-            display: none;
-        }
-        .status.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .status.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .produtos-section {
-            background: #f8f9fa;
-            padding: 30px;
-            margin: 20px 0;
+        .btn-add {
+            background: #2ed573;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
             border-radius: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 1rem 0;
         }
-        .produto-item {
-            background: white;
-            padding: 20px;
-            margin: 15px 0;
-            border-radius: 8px;
-            border: 1px solid #ddd;
+        .total {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+            text-align: right;
+            margin-top: 1rem;
         }
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 20px;
-        }
-        .pedido-info {
-            background: #e8f5e8;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-        }
+        .status { padding: 1rem; border-radius: 10px; margin: 1rem 0; text-align: center; font-weight: bold; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🏭 DESIGNTEX TECIDOS</h1>
-            <p>Sistema de Emissão de Pedidos Online</p>
+    <nav class="navbar">
+        <h1>🏭 DESIGNTEX TECIDOS</h1>
+        <div class="buttons">
+            <a href="/health" class="btn">🔍 Status</a>
+            <a href="/clientes" class="btn">👥 Clientes</a>
+            <a href="/precos" class="btn">💰 Preços</a>
+            <button onclick="showNewOrder()" class="btn primary">📝 Novo Pedido</button>
         </div>
-        
-        <div class="form-section">
-            <form id="pedidoForm">
-                <div class="form-group">
-                    <label>Cliente:</label>
-                    <select id="cliente" required>
-                        <option value="">Selecione um cliente...</option>
-                    </select>
-                </div>
-                
-                <div class="form-row">
+    </nav>
+    
+    <div class="container">
+        <!-- Seção de Novo Pedido -->
+        <div id="newOrderSection" class="card">
+            <h2>📝 Emitir Novo Pedido</h2>
+            
+            <form id="orderForm">
+                <div class="grid">
                     <div class="form-group">
-                        <label>Representante:</label>
-                        <input type="text" id="representante" value="Sistema Online" required>
+                        <label>Cliente (CNPJ):</label>
+                        <select id="clienteSelect" required>
+                            <option value="">Carregando clientes...</option>
+                        </select>
                     </div>
                     <div class="form-group">
-                        <label>Número do Pedido:</label>
-                        <input type="text" id="numeroPedido" readonly style="background: #f0f0f0;">
+                        <label>Representante:</label>
+                        <input type="text" id="representante" placeholder="Nome do representante" required>
                     </div>
                 </div>
                 
                 <div class="form-group">
                     <label>Observações:</label>
-                    <textarea id="observacoes" rows="3" placeholder="Digite observações do pedido..."></textarea>
+                    <textarea id="observacoes" placeholder="Observações do pedido (opcional)" rows="3"></textarea>
                 </div>
                 
-                <div class="produtos-section">
-                    <h3>📦 Produtos Disponíveis</h3>
-                    <div id="produtosList"></div>
-                </div>
-                
-                <div class="pedido-info">
-                    <h3>💰 Resumo do Pedido</h3>
-                    <div id="resumoPedido">
-                        <p><strong>Total de Itens:</strong> <span id="totalItens">0</span></p>
-                        <p><strong>Valor Total:</strong> R$ <span id="valorTotal">0,00</span></p>
+                <h3>📦 Itens do Pedido</h3>
+                <div id="itensContainer">
+                    <div class="item-row">
+                        <div>
+                            <label>Produto:</label>
+                            <select class="produto-select" required>
+                                <option value="">Carregando produtos...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label>Quantidade:</label>
+                            <input type="number" class="quantidade" step="0.01" min="0" placeholder="0.00" required>
+                        </div>
+                        <div>
+                            <label>Preço Unitário:</label>
+                            <input type="number" class="preco-unitario" step="0.01" min="0" placeholder="0.00" readonly>
+                        </div>
+                        <div>
+                            <label>Total:</label>
+                            <input type="number" class="preco-total" step="0.01" min="0" placeholder="0.00" readonly>
+                        </div>
+                        <div>
+                            <button type="button" class="btn-remove" onclick="removeItem(this)">🗑️</button>
+                        </div>
                     </div>
                 </div>
                 
-                <button type="submit" class="btn btn-success">📋 Criar Pedido</button>
-                <button type="button" class="btn" onclick="window.location.href='/'">🏠 Voltar</button>
+                <button type="button" class="btn-add" onclick="addItem()">➕ Adicionar Item</button>
+                
+                <div class="total">
+                    Total do Pedido: R$ <span id="totalPedido">0.00</span>
+                </div>
+                
+                <div style="text-align: center; margin-top: 2rem;">
+                    <button type="submit" class="btn primary" style="font-size: 1.2em; padding: 1rem 3rem;">
+                        🚀 Emitir Pedido
+                    </button>
+                </div>
             </form>
-            
-            <div id="status" class="status"></div>
-            <div id="loading" class="loading">
-                <p>🔄 Criando pedido...</p>
-            </div>
+        </div>
+        
+        <!-- Status Messages -->
+        <div id="statusMessage" class="hidden"></div>
+        
+        <!-- Informações do Sistema -->
+        <div class="card">
+            <h2>📊 Sistema Online - Railway PostgreSQL</h2>
+            <p>✅ Banco de dados em produção</p>
+            <p>✅ API funcionando</p>
+            <p>✅ Pronto para emitir pedidos</p>
         </div>
     </div>
-
+    
     <script>
+        let clientes = [];
+        let precos = [];
+        
         // Carregar dados iniciais
-        document.addEventListener('DOMContentLoaded', function() {
-            carregarClientes();
-            carregarProdutos();
-            obterNumeroPedido();
-        });
-
-        // Carregar clientes
-        function carregarClientes() {
-            fetch('/clientes')
-                .then(response => response.json())
-                .then(data => {
-                    const select = document.getElementById('cliente');
-                    data.clientes.forEach(cliente => {
-                        const option = document.createElement('option');
-                        option.value = cliente.cnpj;
-                        option.textContent = `${cliente.razao_social} (${cliente.cnpj})`;
-                        select.appendChild(option);
-                    });
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar clientes:', error);
-                });
-        }
-
-        // Carregar produtos
-        function carregarProdutos() {
-            fetch('/precos')
-                .then(response => response.json())
-                .then(data => {
-                    const container = document.getElementById('produtosList');
-                    data.precos.forEach(produto => {
-                        const produtoDiv = document.createElement('div');
-                        produtoDiv.className = 'produto-item';
-                        produtoDiv.innerHTML = `
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <div>
-                                    <h4>${produto.artigo}</h4>
-                                    <p><strong>Código:</strong> ${produto.codigo}</p>
-                                    <p><strong>Descrição:</strong> ${produto.descricao}</p>
-                                    <p><strong>ICMS 18%:</strong> R$ ${produto.icms_18.toFixed(2)}</p>
-                                </div>
-                                <div style="text-align: right;">
-                                    <label>Quantidade:</label>
-                                    <input type="number" 
-                                           id="qty_${produto.codigo}" 
-                                           min="0" 
-                                           step="1" 
-                                           value="0" 
-                                           style="width: 80px; margin: 5px 0;"
-                                           onchange="calcularTotal()">
-                                    <p><strong>R$ ${produto.icms_18.toFixed(2)}</strong></p>
-                                </div>
-                            </div>
-                        `;
-                        container.appendChild(produtoDiv);
-                    });
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar produtos:', error);
-                });
-        }
-
-        // Obter número do pedido
-        function obterNumeroPedido() {
-            fetch('/proximo-numero-pedido')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('numeroPedido').value = data.numero;
-                })
-                .catch(error => {
-                    console.error('Erro ao obter número do pedido:', error);
-                    document.getElementById('numeroPedido').value = '0001';
-                });
-        }
-
-        // Calcular total
-        function calcularTotal() {
-            let totalItens = 0;
-            let valorTotal = 0;
-
-            // Buscar todos os inputs de quantidade
-            const inputs = document.querySelectorAll('input[id^="qty_"]');
-            inputs.forEach(input => {
-                const quantidade = parseInt(input.value) || 0;
-                if (quantidade > 0) {
-                    totalItens += quantidade;
-                    // Buscar preço do produto (seria melhor ter em data attributes)
-                    const preco = parseFloat(input.parentNode.querySelector('p strong').textContent.replace('R$ ', ''));
-                    valorTotal += quantidade * preco;
-                }
-            });
-
-            document.getElementById('totalItens').textContent = totalItens;
-            document.getElementById('valorTotal').textContent = valorTotal.toFixed(2).replace('.', ',');
-        }
-
-        // Enviar formulário
-        document.getElementById('pedidoForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            const loading = document.getElementById('loading');
-            const status = document.getElementById('status');
-            
-            loading.style.display = 'block';
-            status.style.display = 'none';
-
-            // Coletar dados do formulário
-            const formData = {
-                cnpj_cliente: document.getElementById('cliente').value,
-                representante: document.getElementById('representante').value,
-                observacoes: document.getElementById('observacoes').value,
-                itens: []
-            };
-
-            // Coletar itens
-            const inputs = document.querySelectorAll('input[id^="qty_"]');
-            inputs.forEach(input => {
-                const quantidade = parseInt(input.value) || 0;
-                if (quantidade > 0) {
-                    const codigo = input.id.replace('qty_', '');
-                    formData.itens.push({
-                        codigo: codigo,
-                        quantidade: quantidade
-                    });
-                }
-            });
-
-            if (formData.itens.length === 0) {
-                loading.style.display = 'none';
-                mostrarStatus('error', 'Adicione pelo menos um item ao pedido!');
-                return;
+        async function loadInitialData() {
+            try {
+                // Carregar clientes
+                const clientesRes = await fetch('/clientes');
+                const clientesData = await clientesRes.json();
+                clientes = clientesData.clientes;
+                
+                // Carregar preços
+                const precosRes = await fetch('/precos');
+                const precosData = await precosRes.json();
+                precos = precosData.precos;
+                
+                updateClienteSelect();
+                updateProdutoSelects();
+                
+            } catch (error) {
+                console.error('Erro ao carregar dados:', error);
+                showStatus('Erro ao carregar dados iniciais', 'error');
             }
-
-            // Enviar pedido
-            fetch('/pedidos', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                loading.style.display = 'none';
-                if (data.success) {
-                    mostrarStatus('success', `✅ Pedido ${data.numero_pedido} criado com sucesso!`);
-                    document.getElementById('pedidoForm').reset();
-                    obterNumeroPedido();
-                } else {
-                    mostrarStatus('error', `❌ Erro: ${data.message}`);
-                }
-            })
-            .catch(error => {
-                loading.style.display = 'none';
-                mostrarStatus('error', `❌ Erro ao criar pedido: ${error.message}`);
+        }
+        
+        function updateClienteSelect() {
+            const select = document.getElementById('clienteSelect');
+            select.innerHTML = '<option value="">Selecione um cliente</option>';
+            
+            clientes.forEach(cliente => {
+                const option = document.createElement('option');
+                option.value = cliente.cnpj;
+                option.textContent = `${cliente.cnpj} - ${cliente.razao_social}`;
+                option.dataset.razaoSocial = cliente.razao_social;
+                select.appendChild(option);
             });
-        });
-
-        function mostrarStatus(type, message) {
-            const status = document.getElementById('status');
-            status.className = `status ${type}`;
-            status.textContent = message;
-            status.style.display = 'block';
+        }
+        
+        function updateProdutoSelects() {
+            document.querySelectorAll('.produto-select').forEach(select => {
+                select.innerHTML = '<option value="">Selecione um produto</option>';
+                
+                precos.forEach(preco => {
+                    const option = document.createElement('option');
+                    option.value = preco.codigo;
+                    option.textContent = `${preco.artigo} - ${preco.descricao}`;
+                    option.dataset.preco = preco.icms_18;
+                    option.dataset.artigo = preco.artigo;
+                    option.dataset.descricao = preco.descricao;
+                    select.appendChild(option);
+                });
+            });
+        }
+        
+        function addItem() {
+            const container = document.getElementById('itensContainer');
+            const newItem = container.firstElementChild.cloneNode(true);
+            
+            // Limpar valores
+            newItem.querySelectorAll('input').forEach(input => input.value = '');
+            newItem.querySelector('select').selectedIndex = 0;
+            
+            container.appendChild(newItem);
+            updateProdutoSelects();
+            setupItemEvents(newItem);
+        }
+        
+        function removeItem(button) {
+            const container = document.getElementById('itensContainer');
+            if (container.children.length > 1) {
+                button.closest('.item-row').remove();
+                calculateTotal();
+            }
+        }
+        
+        function setupItemEvents(item) {
+            const produtoSelect = item.querySelector('.produto-select');
+            const quantidade = item.querySelector('.quantidade');
+            const precoUnitario = item.querySelector('.preco-unitario');
+            const precoTotal = item.querySelector('.preco-total');
+            
+            produtoSelect.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                if (selectedOption.dataset.preco) {
+                    precoUnitario.value = selectedOption.dataset.preco;
+                    calculateItemTotal(item);
+                }
+            });
+            
+            quantidade.addEventListener('input', () => calculateItemTotal(item));
+        }
+        
+        function calculateItemTotal(item) {
+            const quantidade = parseFloat(item.querySelector('.quantidade').value) || 0;
+            const precoUnitario = parseFloat(item.querySelector('.preco-unitario').value) || 0;
+            const precoTotal = item.querySelector('.preco-total');
+            
+            const total = quantidade * precoUnitario;
+            precoTotal.value = total.toFixed(2);
+            
+            calculateTotal();
+        }
+        
+        function calculateTotal() {
+            let total = 0;
+            document.querySelectorAll('.preco-total').forEach(input => {
+                total += parseFloat(input.value) || 0;
+            });
+            
+            document.getElementById('totalPedido').textContent = total.toFixed(2);
+        }
+        
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusMessage');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+            statusDiv.classList.remove('hidden');
             
             setTimeout(() => {
-                status.style.display = 'none';
+                statusDiv.classList.add('hidden');
             }, 5000);
         }
+        
+        function showNewOrder() {
+            document.getElementById('newOrderSection').scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        // Setup form submission
+        document.getElementById('orderForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const clienteSelect = document.getElementById('clienteSelect');
+            const selectedOption = clienteSelect.options[clienteSelect.selectedIndex];
+            
+            if (!selectedOption.value) {
+                showStatus('Selecione um cliente', 'error');
+                return;
+            }
+            
+            const itens = [];
+            document.querySelectorAll('.item-row').forEach(row => {
+                const produtoSelect = row.querySelector('.produto-select');
+                const produtoOption = produtoSelect.options[produtoSelect.selectedIndex];
+                const quantidade = parseFloat(row.querySelector('.quantidade').value) || 0;
+                const precoUnitario = parseFloat(row.querySelector('.preco-unitario').value) || 0;
+                const precoTotal = parseFloat(row.querySelector('.preco-total').value) || 0;
+                
+                if (produtoOption.value && quantidade > 0) {
+                    itens.push({
+                        artigo: produtoOption.dataset.artigo,
+                        codigo: produtoOption.value,
+                        descricao: produtoOption.dataset.descricao,
+                        quantidade: quantidade,
+                        preco_unitario: precoUnitario,
+                        preco_total: precoTotal
+                    });
+                }
+            });
+            
+            if (itens.length === 0) {
+                showStatus('Adicione pelo menos um item ao pedido', 'error');
+                return;
+            }
+            
+            const pedidoData = {
+                cnpj_cliente: selectedOption.value,
+                razao_social_cliente: selectedOption.dataset.razaoSocial,
+                representante: document.getElementById('representante').value,
+                observacoes: document.getElementById('observacoes').value,
+                valor_total: parseFloat(document.getElementById('totalPedido').textContent),
+                itens: itens
+            };
+            
+            try {
+                const response = await fetch('/criar-pedido', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(pedidoData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showStatus(`✅ Pedido ${result.numero_pedido} criado com sucesso!`, 'success');
+                    document.getElementById('orderForm').reset();
+                    document.getElementById('totalPedido').textContent = '0.00';
+                    
+                    // Reset itens
+                    const container = document.getElementById('itensContainer');
+                    container.innerHTML = container.firstElementChild.outerHTML;
+                    updateProdutoSelects();
+                    setupItemEvents(container.firstElementChild);
+                    
+                } else {
+                    showStatus(`❌ Erro: ${result.erro}`, 'error');
+                }
+                
+            } catch (error) {
+                console.error('Erro ao criar pedido:', error);
+                showStatus('❌ Erro ao conectar com servidor', 'error');
+            }
+        });
+        
+        // Setup initial events
+        document.addEventListener('DOMContentLoaded', function() {
+            loadInitialData();
+            setupItemEvents(document.querySelector('.item-row'));
+        });
     </script>
 </body>
 </html>
     ''')
-
-
-@app.route('/proximo-numero-pedido')
-def api_proximo_numero():
-    """API para obter próximo número de pedido"""
-    numero = obter_proximo_numero_pedido()
-    if numero:
-        return jsonify({'numero': numero})
-    else:
-        return jsonify({'error': 'Erro ao obter número do pedido'}), 500
-
-
-@app.route('/pedidos', methods=['POST'])
-def criar_pedido():
-    """API para criar pedidos"""
-    try:
-        data = request.json
-
-        # Validar dados
-        if not data.get('cnpj_cliente'):
-            return jsonify({'success': False, 'message': 'CNPJ do cliente é obrigatório'}), 400
-
-        if not data.get('itens') or len(data.get('itens', [])) == 0:
-            return jsonify({'success': False, 'message': 'Adicione pelo menos um item'}), 400
-
-        # Obter número do pedido
-        numero_pedido = obter_proximo_numero_pedido()
-        if not numero_pedido:
-            return jsonify({'success': False, 'message': 'Erro ao gerar número do pedido'}), 500
-
-        # Calcular valor total
-        valor_total = 0
-        # Aqui você calcularia baseado nos itens e preços
-
-        # Inserir pedido no banco
-        conn = conectar_postgresql()
-        if not conn:
-            return jsonify({'success': False, 'message': 'Erro de conexão com banco'}), 500
-
-        try:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO pedidos (numero_pedido, cnpj_cliente, representante, observacoes, valor_total)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (
-                numero_pedido,
-                data['cnpj_cliente'],
-                data.get('representante', 'Sistema Online'),
-                data.get('observacoes', ''),
-                valor_total
-            ))
-
-            conn.commit()
-            cursor.close()
-            conn.close()
-
-            return jsonify({
-                'success': True,
-                'numero_pedido': numero_pedido,
-                'message': 'Pedido criado com sucesso'
-            })
-
-        except Exception as e:
-            conn.rollback()
-            conn.close()
-            return jsonify({'success': False, 'message': f'Erro ao salvar pedido: {str(e)}'}), 500
-
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Erro interno: {str(e)}'}), 500
 
 
 @app.route('/health')
