@@ -4,8 +4,7 @@ builder = "nixpacks"
 [deploy]
 healthcheckPath = "/health"
 healthcheckTimeout = 300
-restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 10
+restartPolicyType = "never"
 
 [env]
 ENVIRONMENT = "production"

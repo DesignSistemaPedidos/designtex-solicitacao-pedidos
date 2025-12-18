@@ -35,21 +35,32 @@ def configurar_encoding():
 # Executar configuração de encoding
 configurar_encoding()
 
-# CONFIGURAÇÃO DO BANCO DE DADOS (LOCAL E RAILWAY)
+# CONFIGURAÇÃO FLEXÍVEL DE BANCO DE DADOS
 
 
 def get_database_config():
     """Obter configuração do banco baseada no ambiente"""
 
+    # Verificar se deve usar Railway
     environment = os.getenv('ENVIRONMENT', 'development')
+    database_url = os.getenv('DATABASE_URL')
 
-    if environment == 'production':
-        print("🌐 Usando RAILWAY PostgreSQL (Produção)")
-        return {
-            'database_url': 'postgresql://postgres:zGgADknoSZLTjavfpImTgTBAVSicvJNY@metro.proxy.rlwy.net:47441/railway'
-        }
+    if environment == 'production' or database_url:
+        print("🌐 Configuração RAILWAY (Produção)")
+        if database_url:
+            return {'database_url': database_url}
+        else:
+            return {
+                'host': os.getenv('RAILWAY_DB_HOST'),
+                'database': os.getenv('RAILWAY_DB_NAME', 'railway'),
+                'user': os.getenv('RAILWAY_DB_USER', 'postgres'),
+                'password': os.getenv('RAILWAY_DB_PASSWORD'),
+                'port': os.getenv('RAILWAY_DB_PORT', '5432'),
+                'client_encoding': 'UTF8',
+                'connect_timeout': 30
+            }
     else:
-        print("🏠 Usando PostgreSQL LOCAL (Desenvolvimento)")
+        print("🏠 Configuração LOCAL (Desenvolvimento)")
         return {
             'host': os.getenv('LOCAL_DB_HOST', 'localhost'),
             'database': os.getenv('LOCAL_DB_NAME', 'designtex_db'),
@@ -74,17 +85,25 @@ def conectar_postgresql():
         try:
             print(f"🔄 Tentando conectar com encoding: {encoding}")
 
-            # Se tiver DATABASE_URL (Railway)
+            # Se tiver DATABASE_URL (Railway), usar ela
             if 'database_url' in DATABASE_CONFIG:
                 database_url = DATABASE_CONFIG['database_url']
-                url_with_encoding = f"{database_url}?client_encoding={encoding}"
-                conn = psycopg2.connect(url_with_encoding)
+
+                # Adicionar encoding na URL
+                if '?' in database_url:
+                    database_url += f'&client_encoding={encoding}'
+                else:
+                    database_url += f'?client_encoding={encoding}'
+
+                conn = psycopg2.connect(database_url)
+
             else:
-                # Configuração local
+                # Usar configuração tradicional (local)
                 config = DATABASE_CONFIG.copy()
                 config['client_encoding'] = encoding
                 conn = psycopg2.connect(**config)
 
+            # Configurar encoding após conexão
             conn.set_client_encoding(encoding)
 
             # Testar conexão
@@ -94,29 +113,13 @@ def conectar_postgresql():
             cursor.close()
 
             print(f"✅ Conectado com sucesso usando encoding: {encoding}")
-            print(f"📋 PostgreSQL Version: {str(resultado[0])[:50]}...")
+            print(f"📋 PostgreSQL: {str(resultado[0])[:60]}...")
 
             return conn
 
-        except UnicodeDecodeError as e:
-            print(f"❌ Erro de encoding {encoding}: {str(e)[:100]}...")
-            if 'conn' in locals():
-                conn.close()
-            continue
-
-        except psycopg2.OperationalError as e:
-            error_msg = str(e)
-            if 'codec' in error_msg or 'decode' in error_msg:
-                print(f"❌ Erro de encoding {encoding}: {error_msg[:100]}...")
-                if 'conn' in locals():
-                    conn.close()
-                continue
-            else:
-                print(f"❌ Erro de conexão: {error_msg}")
-                return None
-
         except Exception as e:
-            print(f"❌ Erro geral com encoding {encoding}: {str(e)[:100]}...")
+            error_msg = str(e)
+            print(f"❌ Erro com encoding {encoding}: {error_msg[:80]}...")
             if 'conn' in locals():
                 conn.close()
             continue
@@ -126,7 +129,8 @@ def conectar_postgresql():
 
 
 def init_database():
-    """Inicializar banco PostgreSQL"""
+    """Inicializar banco PostgreSQL com encoding seguro"""
+
     print("🔄 Inicializando PostgreSQL...")
 
     conn = conectar_postgresql()
@@ -137,7 +141,15 @@ def init_database():
     try:
         cursor = conn.cursor()
 
-        # Verificar tabelas existentes
+        # Configurar encoding da sessão (modo compatível)
+        try:
+            cursor.execute("SET client_encoding TO 'SQL_ASCII';")
+            cursor.execute("SET standard_conforming_strings TO on;")
+            print("✅ Encoding da sessão configurado")
+        except:
+            print("⚠️  Usando encoding padrão do servidor")
+
+        # Verificar se as tabelas já existem
         cursor.execute("""
             SELECT table_name FROM information_schema.tables 
             WHERE table_schema = 'public'
@@ -151,6 +163,7 @@ def init_database():
             conn.close()
             return True
 
+        # Criar tabelas com encoding seguro
         print("📋 Criando tabelas...")
 
         # Tabela clientes
@@ -165,38 +178,35 @@ def init_database():
             )
         """)
 
-        # Tabela pedidos com mais campos
+        # Tabela pedidos
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS pedidos (
                 id SERIAL PRIMARY KEY,
                 numero_pedido VARCHAR(10) UNIQUE NOT NULL,
                 cnpj_cliente VARCHAR(18),
-                razao_social_cliente VARCHAR(200),
                 representante VARCHAR(100),
                 observacoes TEXT,
-                valor_total DECIMAL(10,2) DEFAULT 0,
-                status VARCHAR(20) DEFAULT 'PENDENTE',
+                valor_total DECIMAL(10,2),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
-        # Tabela itens do pedido
+        # Tabela itens_pedido
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS pedido_itens (
+            CREATE TABLE IF NOT EXISTS itens_pedido (
                 id SERIAL PRIMARY KEY,
-                pedido_id INTEGER REFERENCES pedidos(id),
                 numero_pedido VARCHAR(10),
-                artigo VARCHAR(100),
-                codigo VARCHAR(50),
+                artigo VARCHAR(50),
+                codigo VARCHAR(20),
                 descricao VARCHAR(200),
-                quantidade DECIMAL(10,2),
-                preco_unitario DECIMAL(10,2),
-                preco_total DECIMAL(10,2),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                quantidade INTEGER,
+                valor_unitario DECIMAL(10,2),
+                valor_total DECIMAL(10,2),
+                FOREIGN KEY (numero_pedido) REFERENCES pedidos(numero_pedido)
             )
         """)
 
-        # Tabela sequencia
+        # Tabela sequencia_pedidos
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sequencia_pedidos (
                 id INTEGER PRIMARY KEY DEFAULT 1,
@@ -204,13 +214,14 @@ def init_database():
             )
         """)
 
+        # Inserir sequência inicial se não existir
         cursor.execute("""
             INSERT INTO sequencia_pedidos (id, ultimo_numero) 
             VALUES (1, 0) 
             ON CONFLICT (id) DO NOTHING
         """)
 
-        # Tabelas de preços
+        # Tabelas de preços (estrutura básica)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS precos_normal (
                 id SERIAL PRIMARY KEY,
@@ -224,6 +235,19 @@ def init_database():
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS precos_ld (
+                id SERIAL PRIMARY KEY,
+                artigo VARCHAR(50),
+                codigo VARCHAR(20),
+                descricao VARCHAR(200),
+                icms_18_ld DECIMAL(10,2),
+                icms_12_ld DECIMAL(10,2),
+                icms_7_ld DECIMAL(10,2),
+                ret_ld_mg DECIMAL(10,2)
+            )
+        """)
+
         conn.commit()
         print("✅ Tabelas PostgreSQL criadas com sucesso!")
 
@@ -232,6 +256,7 @@ def init_database():
 
         cursor.close()
         conn.close()
+
         return True
 
     except Exception as e:
@@ -243,11 +268,12 @@ def init_database():
 
 
 def inserir_dados_iniciais(cursor, conn):
-    """Inserir dados iniciais"""
-    try:
-        print("📋 Inserindo dados iniciais...")
+    """Inserir dados iniciais com encoding seguro"""
 
-        # Clientes
+    try:
+        print("📋 Inserindo clientes iniciais...")
+
+        # Clientes básicos (sem acentos para evitar problemas de encoding)
         clientes = [
             ('12.345.678/0001-90', 'EMPRESA ABC LTDA', 'EMPRESA ABC', '11999990001'),
             ('98.765.432/0001-10', 'COMERCIAL XYZ SA',
@@ -263,15 +289,21 @@ def inserir_dados_iniciais(cursor, conn):
                 ON CONFLICT (cnpj) DO NOTHING
             """, (cnpj, razao, fantasia, telefone))
 
-        # Preços
+        conn.commit()
+        print("✅ Clientes iniciais inseridos!")
+
+        # Preços básicos
+        print("📋 Inserindo preços iniciais...")
+
         precos = [
             ('ALGODAO 30/1', 'ALG301', 'Tecido algodao 30/1',
              12.50, 11.80, 11.20, 10.90),
             ('POLIESTER 150D', 'POL150', 'Tecido poliester 150D',
              15.30, 14.60, 13.90, 13.50),
-            ('VISCOSE 120G', 'VIS120', 'Tecido viscose 120g',
-             18.90, 18.10, 17.30, 16.90),
-            ('LYCRA 180G', 'LYC180', 'Tecido lycra 180g', 22.40, 21.60, 20.80, 20.40)
+            ('VISCOSE 40/1', 'VIS401', 'Tecido viscose 40/1',
+             18.90, 17.80, 17.20, 16.90),
+            ('ELASTANO 220G', 'ELA220', 'Tecido elastano 220g',
+             22.50, 21.30, 20.90, 20.50)
         ]
 
         for artigo, codigo, desc, p18, p12, p7, ret in precos:
@@ -282,10 +314,10 @@ def inserir_dados_iniciais(cursor, conn):
             """, (artigo, codigo, desc, p18, p12, p7, ret))
 
         conn.commit()
-        print("✅ Dados iniciais inseridos!")
+        print("✅ Preços iniciais inseridos!")
 
     except Exception as e:
-        print(f"⚠️ Erro ao inserir dados iniciais: {e}")
+        print(f"⚠️  Erro ao inserir dados iniciais: {e}")
 
 
 def obter_proximo_numero_pedido():
@@ -302,7 +334,7 @@ def obter_proximo_numero_pedido():
         conn.commit()
         cursor.close()
         conn.close()
-        return str(numero).zfill(4)
+        return str(numero).zfill(4)  # Formatar com zeros à esquerda
     except Exception as e:
         print(f"Erro ao obter número do pedido: {e}")
         if conn:
@@ -354,68 +386,52 @@ def buscar_precos_normal():
 
 
 def salvar_pedido(dados_pedido):
-    """Salvar pedido completo no banco"""
+    """Salvar pedido no banco"""
     conn = conectar_postgresql()
     if not conn:
-        return {'success': False, 'erro': 'Erro de conexão'}
+        return False
 
     try:
         cursor = conn.cursor()
 
-        # Obter próximo número
-        numero_pedido = obter_proximo_numero_pedido()
-        if not numero_pedido:
-            return {'success': False, 'erro': 'Erro ao gerar número do pedido'}
-
         # Inserir pedido principal
         cursor.execute("""
-            INSERT INTO pedidos (numero_pedido, cnpj_cliente, razao_social_cliente, representante, observacoes, valor_total, status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            RETURNING id
+            INSERT INTO pedidos (numero_pedido, cnpj_cliente, representante, observacoes, valor_total) 
+            VALUES (%s, %s, %s, %s, %s)
         """, (
-            numero_pedido,
-            dados_pedido.get('cnpj_cliente'),
-            dados_pedido.get('razao_social_cliente'),
-            dados_pedido.get('representante'),
-            dados_pedido.get('observacoes'),
-            dados_pedido.get('valor_total', 0),
-            'PENDENTE'
+            dados_pedido['numero_pedido'],
+            dados_pedido['cnpj_cliente'],
+            dados_pedido['representante'],
+            dados_pedido['observacoes'],
+            dados_pedido['valor_total']
         ))
 
-        pedido_id = cursor.fetchone()[0]
-
         # Inserir itens do pedido
-        for item in dados_pedido.get('itens', []):
+        for item in dados_pedido['itens']:
             cursor.execute("""
-                INSERT INTO pedido_itens (pedido_id, numero_pedido, artigo, codigo, descricao, quantidade, preco_unitario, preco_total)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO itens_pedido (numero_pedido, artigo, codigo, descricao, quantidade, valor_unitario, valor_total) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
             """, (
-                pedido_id,
-                numero_pedido,
-                item.get('artigo'),
-                item.get('codigo'),
-                item.get('descricao'),
-                item.get('quantidade', 0),
-                item.get('preco_unitario', 0),
-                item.get('preco_total', 0)
+                dados_pedido['numero_pedido'],
+                item['artigo'],
+                item['codigo'],
+                item['descricao'],
+                item['quantidade'],
+                item['valor_unitario'],
+                item['valor_total']
             ))
 
         conn.commit()
         cursor.close()
         conn.close()
-
-        return {
-            'success': True,
-            'numero_pedido': numero_pedido,
-            'pedido_id': pedido_id
-        }
+        return True
 
     except Exception as e:
         print(f"Erro ao salvar pedido: {e}")
         if conn:
             conn.rollback()
             conn.close()
-        return {'success': False, 'erro': str(e)}
+        return False
 
 
 # FLASK APP
@@ -424,580 +440,651 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    """Página inicial"""
+    """Página inicial com sistema completo de pedidos"""
     return render_template_string('''
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DESIGNTEX TECIDOS - Sistema Online</title>
+    <title>DESIGNTEX TECIDOS - Sistema de Pedidos</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
+            color: #333;
+        }
+
+        .header {
+            background: rgba(255,255,255,0.95);
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+        }
+
+        .logo {
             display: flex;
             align-items: center;
-            justify-content: center;
-            padding: 20px;
+            gap: 15px;
         }
-        .container {
-            background: white;
-            padding: 50px;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 600px;
-            width: 100%;
-        }
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 3em;
-        }
-        .subtitle {
-            color: #666;
-            margin-bottom: 40px;
-            font-size: 1.2em;
-        }
-        .status {
-            background: #e8f5e8;
-            color: #2d5f2d;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 30px 0;
-            font-weight: bold;
-            font-size: 1.1em;
-        }
-        .btn {
-            display: inline-block;
-            background: #667eea;
-            color: white;
-            padding: 15px 35px;
-            text-decoration: none;
-            border-radius: 25px;
-            margin: 15px;
-            transition: all 0.3s ease;
-            font-weight: bold;
-            font-size: 1.1em;
-        }
-        .btn:hover {
-            background: #5a6fd8;
-            transform: translateY(-3px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-        }
-        .btn-primary {
-            background: #28a745;
-            font-size: 1.2em;
-            padding: 18px 40px;
-        }
-        .btn-primary:hover {
-            background: #218838;
-        }
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 30px;
-            margin: 40px 0;
-        }
-        .feature {
-            background: #f8f9ff;
-            padding: 25px;
-            border-radius: 15px;
-            text-align: center;
-        }
-        .feature h3 {
+
+        .logo h1 {
             color: #667eea;
-            margin-bottom: 15px;
-            font-size: 1.3em;
+            font-size: 1.8em;
+            font-weight: 700;
         }
-        .feature p {
-            color: #666;
-            line-height: 1.6;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🏭 DESIGNTEX TECIDOS</h1>
-        <p class="subtitle">Sistema de Pedidos Online - Versão Railway</p>
-        
-        <div class="status">
-            🌐 ✅ Sistema Online - Railway PostgreSQL Conectado
-        </div>
-        
-        <a href="/interface" class="btn btn-primary">🛒 CRIAR PEDIDO ONLINE</a>
-        
-        <div class="features">
-            <div class="feature">
-                <h3>🔍 Monitoramento</h3>
-                <p>Health check e status em tempo real</p>
-                <a href="/health" class="btn">Ver Status</a>
-            </div>
-            
-            <div class="feature">
-                <h3>👥 Clientes</h3>
-                <p>Gestão completa de clientes</p>
-                <a href="/clientes" class="btn">Ver Clientes</a>
-            </div>
-            
-            <div class="feature">
-                <h3>💰 Preços</h3>
-                <p>Tabela de preços atualizada</p>
-                <a href="/precos" class="btn">Ver Preços</a>
-            </div>
-        </div>
-        
-        <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #eee;">
-            <h3 style="color: #667eea; margin-bottom: 15px;">🔗 APIs Disponíveis</h3>
-            <p style="color: #666; margin-bottom: 20px;">Endpoints para integração com Power BI e outros sistemas:</p>
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; text-align: left;">
-                <code style="display: block; margin: 5px 0;"><strong>GET</strong> /health - Status do sistema</code>
-                <code style="display: block; margin: 5px 0;"><strong>GET</strong> /clientes - Lista de clientes</code>
-                <code style="display: block; margin: 5px 0;"><strong>GET</strong> /precos - Tabela de preços</code>
-                <code style="display: block; margin: 5px 0;"><strong>POST</strong> /pedidos - Criar pedido</code>
-                <code style="display: block; margin: 5px 0;"><strong>GET</strong> /interface - Interface web</code>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
-    ''')
 
-
-@app.route('/interface')
-def interface_pedidos():
-    """Interface web para criar pedidos"""
-    return render_template_string('''
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DESIGNTEX TECIDOS - Emissão de Pedidos</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        .header {
-            background: #667eea;
+        .status-badge {
+            background: #10b981;
             color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
             padding: 30px;
-            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
         }
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f1f5f9;
         }
-        .header p {
-            font-size: 1.1em;
-            opacity: 0.9;
+
+        .card-title {
+            font-size: 1.5em;
+            color: #1e293b;
+            font-weight: 600;
         }
-        .form-section {
-            padding: 40px;
-        }
-        .form-group {
-            margin-bottom: 25px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-            color: #333;
-        }
-        .form-group input, .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-        }
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            border-color: #667eea;
-            outline: none;
-        }
-        .form-row {
+
+        .form-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
+            margin-bottom: 30px;
         }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 8px;
+        }
+
+        input, select, textarea {
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
         .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
             background: #667eea;
             color: white;
-            border: none;
-            padding: 15px 30px;
+        }
+
+        .btn-primary:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: #64748b;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #475569;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
             border-radius: 8px;
-            font-size: 16px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        th {
+            background: #f8fafc;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        tr:hover {
+            background: #f8fafc;
+        }
+
+        .total-section {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .total-final {
+            font-weight: 700;
+            font-size: 1.3em;
+            color: #667eea;
+            border-top: 2px solid #667eea;
+            padding-top: 10px;
+        }
+
+        .alert {
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .alert-danger {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
             font-weight: bold;
             cursor: pointer;
-            transition: all 0.3s;
         }
-        .btn:hover {
-            background: #5a6fd8;
-            transform: translateY(-2px);
+
+        .close:hover {
+            color: #000;
         }
-        .btn-success {
-            background: #28a745;
-        }
-        .btn-success:hover {
-            background: #218838;
-        }
-        .status {
-            padding: 15px;
+
+        .footer-note {
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            color: #92400e;
+            padding: 16px;
             border-radius: 8px;
-            margin: 20px 0;
-            display: none;
-        }
-        .status.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .status.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .produtos-section {
-            background: #f8f9fa;
-            padding: 30px;
-            margin: 20px 0;
-            border-radius: 10px;
-        }
-        .produto-item {
-            background: white;
-            padding: 20px;
-            margin: 15px 0;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-        }
-        .loading {
-            display: none;
+            margin-top: 20px;
+            font-weight: 500;
             text-align: center;
-            padding: 20px;
         }
-        .pedido-info {
-            background: #e8f5e8;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
+
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .card {
+                margin: 20px 10px;
+                padding: 20px;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🏭 DESIGNTEX TECIDOS</h1>
-            <p>Sistema de Emissão de Pedidos Online</p>
-        </div>
-        
-        <div class="form-section">
-            <form id="pedidoForm">
-                <div class="form-group">
-                    <label>Cliente:</label>
-                    <select id="cliente" required>
-                        <option value="">Selecione um cliente...</option>
-                    </select>
-                </div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Representante:</label>
-                        <input type="text" id="representante" value="Sistema Online" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Número do Pedido:</label>
-                        <input type="text" id="numeroPedido" readonly style="background: #f0f0f0;">
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label>Observações:</label>
-                    <textarea id="observacoes" rows="3" placeholder="Digite observações do pedido..."></textarea>
-                </div>
-                
-                <div class="produtos-section">
-                    <h3>📦 Produtos Disponíveis</h3>
-                    <div id="produtosList"></div>
-                </div>
-                
-                <div class="pedido-info">
-                    <h3>💰 Resumo do Pedido</h3>
-                    <div id="resumoPedido">
-                        <p><strong>Total de Itens:</strong> <span id="totalItens">0</span></p>
-                        <p><strong>Valor Total:</strong> R$ <span id="valorTotal">0,00</span></p>
-                    </div>
-                </div>
-                
-                <button type="submit" class="btn btn-success">📋 Criar Pedido</button>
-                <button type="button" class="btn" onclick="window.location.href='/'">🏠 Voltar</button>
-            </form>
-            
-            <div id="status" class="status"></div>
-            <div id="loading" class="loading">
-                <p>🔄 Criando pedido...</p>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <h1>🏭 DESIGNTEX TECIDOS</h1>
             </div>
+            <div class="status-badge">
+                ✅ Sistema Online
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Formulário de Pedido -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">📋 Novo Pedido de Venda</h2>
+                <button class="btn btn-secondary" onclick="carregarClientes()">
+                    🔄 Atualizar Dados
+                </button>
+            </div>
+
+            <form id="formPedido">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="cliente">Cliente *</label>
+                        <select id="cliente" name="cliente" required>
+                            <option value="">Selecione o cliente...</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="representante">Representante *</label>
+                        <input type="text" id="representante" name="representante" required 
+                               placeholder="Nome do representante">
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label for="observacoes">Observações</label>
+                        <textarea id="observacoes" name="observacoes" 
+                                  placeholder="Informações adicionais sobre o pedido..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Seção de Itens -->
+                <div class="card-header">
+                    <h3>🛍️ Itens do Pedido</h3>
+                    <button type="button" class="btn btn-primary" onclick="adicionarItem()">
+                        ➕ Adicionar Item
+                    </button>
+                </div>
+
+                <div class="table-container">
+                    <table id="tabelaItens">
+                        <thead>
+                            <tr>
+                                <th>Artigo</th>
+                                <th>Código</th>
+                                <th>Descrição</th>
+                                <th>Qtd</th>
+                                <th>Valor Unit.</th>
+                                <th>Total</th>
+                                <th>Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="itensCorpo">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="total-section">
+                    <div class="total-row">
+                        <span>Total de Itens:</span>
+                        <span id="totalItens">0</span>
+                    </div>
+                    <div class="total-row total-final">
+                        <span>Valor Total:</span>
+                        <span id="valorTotal">R$ 0,00</span>
+                    </div>
+                </div>
+
+                <div class="footer-note">
+                    ⚠️ <strong>Pedido sujeito à confirmação da empresa fornecedora.</strong>
+                </div>
+
+                <div style="margin-top: 30px; text-align: center;">
+                    <button type="submit" class="btn btn-success">
+                        💾 Finalizar Pedido
+                    </button>
+                    <button type="button" class="btn btn-secondary" onclick="limparFormulario()">
+                        🗑️ Limpar
+                    </button>
+                    <button type="button" class="btn btn-primary" onclick="visualizarPedido()">
+                        👁️ Visualizar
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- APIs e Informações -->
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">🔗 APIs Disponíveis</h2>
+            </div>
+            
+            <div class="form-grid">
+                <a href="/health" class="btn btn-primary" target="_blank">
+                    🔍 Health Check
+                </a>
+                <a href="/clientes" class="btn btn-primary" target="_blank">
+                    👥 API Clientes
+                </a>
+                <a href="/precos" class="btn btn-primary" target="_blank">
+                    💰 API Preços
+                </a>
+                <a href="/pedidos" class="btn btn-primary" target="_blank">
+                    📋 API Pedidos
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Visualização -->
+    <div id="modalVisualizacao" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="fecharModal()">&times;</span>
+            <div id="conteudoModal"></div>
         </div>
     </div>
 
     <script>
+        let clientes = [];
+        let precos = [];
+        let itensPedido = [];
+        let contadorItens = 0;
+
         // Carregar dados iniciais
         document.addEventListener('DOMContentLoaded', function() {
             carregarClientes();
-            carregarProdutos();
-            obterNumeroPedido();
+            carregarPrecos();
         });
 
-        // Carregar clientes
-        function carregarClientes() {
-            fetch('/clientes')
-                .then(response => response.json())
-                .then(data => {
-                    const select = document.getElementById('cliente');
-                    data.clientes.forEach(cliente => {
-                        const option = document.createElement('option');
-                        option.value = cliente.cnpj;
-                        option.textContent = `${cliente.razao_social} (${cliente.cnpj})`;
-                        select.appendChild(option);
-                    });
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar clientes:', error);
+        async function carregarClientes() {
+            try {
+                const response = await fetch('/clientes');
+                const data = await response.json();
+                clientes = data.clientes;
+                
+                const select = document.getElementById('cliente');
+                select.innerHTML = '<option value="">Selecione o cliente...</option>';
+                
+                clientes.forEach(cliente => {
+                    const option = document.createElement('option');
+                    option.value = cliente.cnpj;
+                    option.textContent = `${cliente.razao_social} (${cliente.cnpj})`;
+                    select.appendChild(option);
                 });
+            } catch (error) {
+                console.error('Erro ao carregar clientes:', error);
+            }
         }
 
-        // Carregar produtos
-        function carregarProdutos() {
-            fetch('/precos')
-                .then(response => response.json())
-                .then(data => {
-                    const container = document.getElementById('produtosList');
-                    data.precos.forEach(produto => {
-                        const produtoDiv = document.createElement('div');
-                        produtoDiv.className = 'produto-item';
-                        produtoDiv.innerHTML = `
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <div>
-                                    <h4>${produto.artigo}</h4>
-                                    <p><strong>Código:</strong> ${produto.codigo}</p>
-                                    <p><strong>Descrição:</strong> ${produto.descricao}</p>
-                                    <p><strong>ICMS 18%:</strong> R$ ${produto.icms_18.toFixed(2)}</p>
-                                </div>
-                                <div style="text-align: right;">
-                                    <label>Quantidade:</label>
-                                    <input type="number" 
-                                           id="qty_${produto.codigo}" 
-                                           min="0" 
-                                           step="1" 
-                                           value="0" 
-                                           style="width: 80px; margin: 5px 0;"
-                                           onchange="calcularTotal()">
-                                    <p><strong>R$ ${produto.icms_18.toFixed(2)}</strong></p>
-                                </div>
-                            </div>
-                        `;
-                        container.appendChild(produtoDiv);
-                    });
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar produtos:', error);
-                });
+        async function carregarPrecos() {
+            try {
+                const response = await fetch('/precos');
+                const data = await response.json();
+                precos = data.precos;
+            } catch (error) {
+                console.error('Erro ao carregar preços:', error);
+            }
         }
 
-        // Obter número do pedido
-        function obterNumeroPedido() {
-            fetch('/proximo-numero-pedido')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('numeroPedido').value = data.numero;
-                })
-                .catch(error => {
-                    console.error('Erro ao obter número do pedido:', error);
-                    document.getElementById('numeroPedido').value = '0001';
-                });
+        function adicionarItem() {
+            contadorItens++;
+            const tbody = document.getElementById('itensCorpo');
+            
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>
+                    <select onchange="atualizarPreco(${contadorItens})" id="artigo_${contadorItens}">
+                        <option value="">Selecionar...</option>
+                        ${precos.map(p => `<option value="${p.artigo}" data-codigo="${p.codigo}" data-descricao="${p.descricao}" data-preco="${p.icms_18}">${p.artigo}</option>`).join('')}
+                    </select>
+                </td>
+                <td><input type="text" id="codigo_${contadorItens}" readonly></td>
+                <td><input type="text" id="descricao_${contadorItens}" readonly></td>
+                <td><input type="number" id="quantidade_${contadorItens}" min="1" value="1" onchange="calcularTotal(${contadorItens})"></td>
+                <td><input type="number" step="0.01" id="valor_${contadorItens}" onchange="calcularTotal(${contadorItens})"></td>
+                <td><span id="total_${contadorItens}">R$ 0,00</span></td>
+                <td><button type="button" class="btn btn-danger" onclick="removerItem(${contadorItens})">🗑️</button></td>
+            `;
+            
+            tbody.appendChild(tr);
         }
 
-        // Calcular total
-        function calcularTotal() {
-            let totalItens = 0;
+        function atualizarPreco(id) {
+            const select = document.getElementById(`artigo_${id}`);
+            const option = select.selectedOptions[0];
+            
+            if (option && option.dataset.codigo) {
+                document.getElementById(`codigo_${id}`).value = option.dataset.codigo;
+                document.getElementById(`descricao_${id}`).value = option.dataset.descricao;
+                document.getElementById(`valor_${id}`).value = parseFloat(option.dataset.preco).toFixed(2);
+                calcularTotal(id);
+            }
+        }
+
+        function calcularTotal(id) {
+            const quantidade = parseInt(document.getElementById(`quantidade_${id}`).value) || 0;
+            const valor = parseFloat(document.getElementById(`valor_${id}`).value) || 0;
+            const total = quantidade * valor;
+            
+            document.getElementById(`total_${id}`).textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+            
+            atualizarTotalGeral();
+        }
+
+        function removerItem(id) {
+            const tr = document.getElementById(`artigo_${id}`).closest('tr');
+            tr.remove();
+            atualizarTotalGeral();
+        }
+
+        function atualizarTotalGeral() {
+            const tbody = document.getElementById('itensCorpo');
+            const totalItens = tbody.children.length;
             let valorTotal = 0;
 
-            // Buscar todos os inputs de quantidade
-            const inputs = document.querySelectorAll('input[id^="qty_"]');
-            inputs.forEach(input => {
-                const quantidade = parseInt(input.value) || 0;
-                if (quantidade > 0) {
-                    totalItens += quantidade;
-                    // Buscar preço do produto (seria melhor ter em data attributes)
-                    const preco = parseFloat(input.parentNode.querySelector('p strong').textContent.replace('R$ ', ''));
-                    valorTotal += quantidade * preco;
-                }
-            });
+            for (let i = 0; i < tbody.children.length; i++) {
+                const totalText = tbody.children[i].querySelector('[id^="total_"]').textContent;
+                const valor = parseFloat(totalText.replace('R$ ', '').replace(',', '.')) || 0;
+                valorTotal += valor;
+            }
 
             document.getElementById('totalItens').textContent = totalItens;
-            document.getElementById('valorTotal').textContent = valorTotal.toFixed(2).replace('.', ',');
+            document.getElementById('valorTotal').textContent = `R$ ${valorTotal.toFixed(2).replace('.', ',')}`;
         }
 
-        // Enviar formulário
-        document.getElementById('pedidoForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+        function limparFormulario() {
+            document.getElementById('formPedido').reset();
+            document.getElementById('itensCorpo').innerHTML = '';
+            atualizarTotalGeral();
+            contadorItens = 0;
+        }
 
-            const loading = document.getElementById('loading');
-            const status = document.getElementById('status');
+        function visualizarPedido() {
+            // Implementar visualização do pedido
+            const modal = document.getElementById('modalVisualizacao');
+            const conteudo = document.getElementById('conteudoModal');
             
-            loading.style.display = 'block';
-            status.style.display = 'none';
+            conteudo.innerHTML = `
+                <h2>📋 Visualização do Pedido</h2>
+                <p>Funcionalidade em desenvolvimento...</p>
+            `;
+            
+            modal.style.display = 'block';
+        }
 
-            // Coletar dados do formulário
-            const formData = {
-                cnpj_cliente: document.getElementById('cliente').value,
-                representante: document.getElementById('representante').value,
-                observacoes: document.getElementById('observacoes').value,
+        function fecharModal() {
+            document.getElementById('modalVisualizacao').style.display = 'none';
+        }
+
+        // Enviar pedido
+        document.getElementById('formPedido').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const dadosPedido = {
+                cliente: formData.get('cliente'),
+                representante: formData.get('representante'),
+                observacoes: formData.get('observacoes'),
                 itens: []
             };
 
             // Coletar itens
-            const inputs = document.querySelectorAll('input[id^="qty_"]');
-            inputs.forEach(input => {
-                const quantidade = parseInt(input.value) || 0;
-                if (quantidade > 0) {
-                    const codigo = input.id.replace('qty_', '');
-                    formData.itens.push({
-                        codigo: codigo,
-                        quantidade: quantidade
+            const tbody = document.getElementById('itensCorpo');
+            for (let i = 0; i < tbody.children.length; i++) {
+                const row = tbody.children[i];
+                const artigo = row.querySelector('[id^="artigo_"]').value;
+                if (artigo) {
+                    dadosPedido.itens.push({
+                        artigo: artigo,
+                        codigo: row.querySelector('[id^="codigo_"]').value,
+                        descricao: row.querySelector('[id^="descricao_"]').value,
+                        quantidade: row.querySelector('[id^="quantidade_"]').value,
+                        valor_unitario: row.querySelector('[id^="valor_"]').value,
+                        valor_total: row.querySelector('[id^="total_"]').textContent.replace('R$ ', '').replace(',', '.')
                     });
                 }
-            });
-
-            if (formData.itens.length === 0) {
-                loading.style.display = 'none';
-                mostrarStatus('error', 'Adicione pelo menos um item ao pedido!');
-                return;
             }
 
-            // Enviar pedido
-            fetch('/pedidos', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData)
-            })
-            .then(response => response.json())
-            .then(data => {
-                loading.style.display = 'none';
-                if (data.success) {
-                    mostrarStatus('success', `✅ Pedido ${data.numero_pedido} criado com sucesso!`);
-                    document.getElementById('pedidoForm').reset();
-                    obterNumeroPedido();
-                } else {
-                    mostrarStatus('error', `❌ Erro: ${data.message}`);
-                }
-            })
-            .catch(error => {
-                loading.style.display = 'none';
-                mostrarStatus('error', `❌ Erro ao criar pedido: ${error.message}`);
-            });
-        });
+            try {
+                const response = await fetch('/criar-pedido', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(dadosPedido)
+                });
 
-        function mostrarStatus(type, message) {
-            const status = document.getElementById('status');
-            status.className = `status ${type}`;
-            status.textContent = message;
-            status.style.display = 'block';
-            
-            setTimeout(() => {
-                status.style.display = 'none';
-            }, 5000);
-        }
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`✅ Pedido ${result.numero_pedido} criado com sucesso!`);
+                    limparFormulario();
+                } else {
+                    alert(`❌ Erro: ${result.message}`);
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('❌ Erro ao enviar pedido');
+            }
+        });
     </script>
 </body>
 </html>
     ''')
-
-
-@app.route('/proximo-numero-pedido')
-def api_proximo_numero():
-    """API para obter próximo número de pedido"""
-    numero = obter_proximo_numero_pedido()
-    if numero:
-        return jsonify({'numero': numero})
-    else:
-        return jsonify({'error': 'Erro ao obter número do pedido'}), 500
-
-
-@app.route('/pedidos', methods=['POST'])
-def criar_pedido():
-    """API para criar pedidos"""
-    try:
-        data = request.json
-
-        # Validar dados
-        if not data.get('cnpj_cliente'):
-            return jsonify({'success': False, 'message': 'CNPJ do cliente é obrigatório'}), 400
-
-        if not data.get('itens') or len(data.get('itens', [])) == 0:
-            return jsonify({'success': False, 'message': 'Adicione pelo menos um item'}), 400
-
-        # Obter número do pedido
-        numero_pedido = obter_proximo_numero_pedido()
-        if not numero_pedido:
-            return jsonify({'success': False, 'message': 'Erro ao gerar número do pedido'}), 500
-
-        # Calcular valor total
-        valor_total = 0
-        # Aqui você calcularia baseado nos itens e preços
-
-        # Inserir pedido no banco
-        conn = conectar_postgresql()
-        if not conn:
-            return jsonify({'success': False, 'message': 'Erro de conexão com banco'}), 500
-
-        try:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO pedidos (numero_pedido, cnpj_cliente, representante, observacoes, valor_total)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (
-                numero_pedido,
-                data['cnpj_cliente'],
-                data.get('representante', 'Sistema Online'),
-                data.get('observacoes', ''),
-                valor_total
-            ))
-
-            conn.commit()
-            cursor.close()
-            conn.close()
-
-            return jsonify({
-                'success': True,
-                'numero_pedido': numero_pedido,
-                'message': 'Pedido criado com sucesso'
-            })
-
-        except Exception as e:
-            conn.rollback()
-            conn.close()
-            return jsonify({'success': False, 'message': f'Erro ao salvar pedido: {str(e)}'}), 500
-
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Erro interno: {str(e)}'}), 500
 
 
 @app.route('/health')
@@ -1014,9 +1101,10 @@ def health():
 
             return jsonify({
                 'status': 'OK',
-                'database': 'PostgreSQL - Conectado (Railway)',
+                'database': 'PostgreSQL - Conectado',
                 'version': version[:50],
-                'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now().isoformat(),
+                'environment': os.getenv('ENVIRONMENT', 'development')
             })
         except Exception as e:
             return jsonify({
@@ -1076,35 +1164,140 @@ def listar_precos():
 
 @app.route('/criar-pedido', methods=['POST'])
 def criar_pedido():
-    """Endpoint para criar pedido"""
+    """Criar novo pedido"""
     try:
-        dados = request.get_json()
-        resultado = salvar_pedido(dados)
-        return jsonify(resultado)
+        dados = request.json
+
+        # Validar dados obrigatórios
+        if not dados.get('cliente') or not dados.get('representante'):
+            return jsonify({
+                'success': False,
+                'message': 'Cliente e representante são obrigatórios'
+            }), 400
+
+        # Obter próximo número do pedido
+        numero_pedido = obter_proximo_numero_pedido()
+        if not numero_pedido:
+            return jsonify({
+                'success': False,
+                'message': 'Erro ao gerar número do pedido'
+            }), 500
+
+        # Calcular valor total
+        valor_total = 0
+        for item in dados.get('itens', []):
+            valor_total += float(item.get('valor_total', 0))
+
+        # Preparar dados do pedido
+        dados_pedido = {
+            'numero_pedido': numero_pedido,
+            'cnpj_cliente': dados['cliente'],
+            'representante': dados['representante'],
+            'observacoes': dados.get('observacoes', '') + '\n\nPedido sujeito à confirmação da empresa fornecedora.',
+            'valor_total': valor_total,
+            'itens': dados.get('itens', [])
+        }
+
+        # Salvar no banco
+        if salvar_pedido(dados_pedido):
+            return jsonify({
+                'success': True,
+                'numero_pedido': numero_pedido,
+                'message': f'Pedido {numero_pedido} criado com sucesso!'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Erro ao salvar pedido no banco'
+            }), 500
+
     except Exception as e:
+        print(f"Erro ao criar pedido: {e}")
         return jsonify({
             'success': False,
-            'erro': f'Erro interno: {str(e)}'
+            'message': f'Erro interno: {str(e)}'
         }), 500
 
 
+@app.route('/pedidos')
+def listar_pedidos():
+    """Listar pedidos em JSON"""
+    conn = conectar_postgresql()
+    if not conn:
+        return jsonify({'pedidos': [], 'total': 0})
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT p.numero_pedido, p.cnpj_cliente, p.representante, 
+                   p.valor_total, p.created_at, c.razao_social
+            FROM pedidos p
+            LEFT JOIN clientes c ON p.cnpj_cliente = c.cnpj
+            ORDER BY p.created_at DESC
+            LIMIT 50
+        """)
+        pedidos = cursor.fetchall()
+
+        pedidos_json = []
+        for pedido in pedidos:
+            pedidos_json.append({
+                'numero_pedido': pedido[0],
+                'cnpj_cliente': pedido[1],
+                'representante': pedido[2],
+                'valor_total': float(pedido[3]) if pedido[3] else 0,
+                'data_pedido': pedido[4].isoformat() if pedido[4] else None,
+                'razao_social': pedido[5] or 'Cliente não encontrado'
+            })
+
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            'pedidos': pedidos_json,
+            'total': len(pedidos_json)
+        })
+
+    except Exception as e:
+        print(f"Erro ao buscar pedidos: {e}")
+        if conn:
+            conn.close()
+        return jsonify({'pedidos': [], 'total': 0, 'error': str(e)})
+
+
 if __name__ == '__main__':
-    # Obter porta do ambiente (Railway define automaticamente)
+    # Porta dinâmica para Railway
     port = int(os.environ.get('PORT', 5001))
 
     # Inicializar banco de dados
     if init_database():
         print("🚀 Iniciando DESIGNTEX TECIDOS - Railway Deploy")
-        print(f"📡 Servidor rodando na porta: {port}")
-        print("🔗 Endpoints disponíveis:")
-        print("   • /health - Status do sistema")
-        print("   • /clientes - Lista de clientes")
-        print("   • /precos - Tabela de preços")
-        print("   • /pedidos - Criar pedidos")
+        print(f"📡 Porta: {port}")
         print("-" * 50)
 
-        # Para Railway: usar host='0.0.0.0' e port do ambiente
         app.run(host='0.0.0.0', port=port, debug=False)
     else:
         print("❌ Falha na inicialização do banco de dados")
-        sys.exit(1)
+
+
+# if __name__ == '__main__':
+# Obter porta do ambiente (Railway usa PORT)
+#   port = int(os.getenv('PORT', 5001))
+
+# Inicializar banco de dados
+#  if init_database():
+#      print("🚀 Iniciando DESIGNTEX TECIDOS - Sistema de Pedidos")
+#      print(f"📡 Servidor rodando na porta: {port}")
+#       print("🔗 Endpoints disponíveis:")
+#       print("   - GET  /            - Interface principal")
+#       print("   - GET  /health      - Status do sistema")
+#      print("   - GET  /clientes    - API de clientes")
+#      print("   - GET  /precos      - API de preços")
+#      print("   - GET  /pedidos     - API de pedidos")
+#      print("   - POST /criar-pedido - Criar novo pedido")
+#       print("-" * 50)
+
+#        app.run(host='0.0.0.0', port=port, debug=False)
+#   else:
+#       print("❌ Falha na inicialização do banco de dados")
+#        print("🔧 Verifique as configurações do PostgreSQL")
+#
