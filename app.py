@@ -618,21 +618,27 @@ def listar_precos():
 
 
 if __name__ == '__main__':
-    # Obter porta do Railway (variável de ambiente PORT)
-    port = int(os.environ.get('PORT', 5001))
-
     # Inicializar banco de dados
     if init_database():
         print("🚀 Iniciando DESIGNTEX TECIDOS - PostgreSQL Web")
+
+        # Porta para Railway (usa PORT da variável de ambiente)
+        port = int(os.getenv('PORT', 5001))
+
         print(f"📡 Servidor rodando na porta: {port}")
-        print("🔗 Endpoints disponíveis:")
-        print("   - /health (health check)")
-        print("   - /clientes (lista clientes)")
-        print("   - /precos (lista preços)")
+        print("🔗 Health check: /health")
+        print("👥 Clientes: /clientes")
+        print("💰 Preços: /precos")
         print("-" * 50)
 
-        # Railway usa host 0.0.0.0 e porta dinâmica
-        app.run(host='0.0.0.0', port=port, debug=False)
+        # Para Railway: host='0.0.0.0' e debug=False em produção
+        debug_mode = os.getenv('ENVIRONMENT', 'development') == 'development'
+
+        app.run(
+            host='0.0.0.0',
+            port=port,
+            debug=debug_mode
+        )
     else:
         print("❌ Falha na inicialização do banco de dados")
         print("🔧 Verifique as configurações do PostgreSQL")
