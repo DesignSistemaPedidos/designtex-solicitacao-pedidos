@@ -147,15 +147,11 @@ def init_database():
         if tabelas_existentes:
             print(
                 f"✅ Banco já inicializado com {len(tabelas_existentes)} tabelas")
-
-            # Verificar e corrigir estrutura das tabelas
-            verificar_e_corrigir_estrutura_tabelas(cursor, conn)
-
             cursor.close()
             conn.close()
             return True
 
-        # Criar tabelas com estrutura completa
+        # Criar tabelas com encoding seguro
         print("📋 Criando tabelas...")
 
         # Tabela clientes
@@ -166,44 +162,61 @@ def init_database():
                 razao_social VARCHAR(200) NOT NULL,
                 nome_fantasia VARCHAR(150),
                 telefone VARCHAR(20),
-                email VARCHAR(100),
-                endereco VARCHAR(200),
-                cidade VARCHAR(100),
-                estado VARCHAR(2),
-                cep VARCHAR(10),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
-        # Tabela pedidos - ESTRUTURA COMPLETA
+        # Tabela pedidos - EXPANDIDA
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS pedidos (
                 id SERIAL PRIMARY KEY,
                 numero_pedido VARCHAR(10) UNIQUE NOT NULL,
-                cnpj_cliente VARCHAR(18),
-                representante VARCHAR(100),
+                nome_representante VARCHAR(100) NOT NULL,
+                cnpj_cliente VARCHAR(18) NOT NULL,
+                razao_social_cliente VARCHAR(200) NOT NULL,
+                telefone_cliente VARCHAR(20),
+                
+                -- Condições do pedido
+                prazo_pagamento VARCHAR(50),
+                tipo_pedido VARCHAR(10),
+                numero_op VARCHAR(50),
+                tipo_frete VARCHAR(10),
+                transportadora_fob TEXT,
+                transportadora_cif TEXT,
+                venda_triangular VARCHAR(10),
+                dados_triangulacao TEXT,
+                regime_ret VARCHAR(10),
+                tipo_produto VARCHAR(20),
+                tabela_precos VARCHAR(50),
+                
+                -- Valores
+                valor_total DECIMAL(12,2) DEFAULT 0,
+                
+                -- Observações
                 observacoes TEXT,
-                valor_total DECIMAL(10,2),
+                
+                -- Controle
                 status VARCHAR(20) DEFAULT 'ATIVO',
-                items TEXT,
-                data_entrega DATE,
-                desconto DECIMAL(5,2) DEFAULT 0,
-                frete DECIMAL(10,2) DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
-        # Tabela itens do pedido
+        # Tabela itens_pedido - NOVA
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS pedido_items (
+            CREATE TABLE IF NOT EXISTS itens_pedido (
                 id SERIAL PRIMARY KEY,
                 pedido_id INTEGER REFERENCES pedidos(id) ON DELETE CASCADE,
-                artigo VARCHAR(50),
-                codigo VARCHAR(20),
-                descricao VARCHAR(200),
-                quantidade DECIMAL(10,2),
-                preco_unitario DECIMAL(10,2),
-                total_item DECIMAL(10,2),
+                numero_pedido VARCHAR(10) NOT NULL,
+                
+                -- Dados do produto
+                artigo VARCHAR(100) NOT NULL,
+                codigo VARCHAR(50) NOT NULL,
+                desenho_cor VARCHAR(100) NOT NULL,
+                metragem DECIMAL(10,2) NOT NULL,
+                preco_metro DECIMAL(10,2) NOT NULL,
+                subtotal DECIMAL(12,2) NOT NULL,
+                
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -223,7 +236,7 @@ def init_database():
             ON CONFLICT (id) DO NOTHING
         """)
 
-        # Tabelas de preços
+        # Tabelas de preços (estrutura básica)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS precos_normal (
                 id SERIAL PRIMARY KEY,
@@ -267,58 +280,6 @@ def init_database():
             conn.rollback()
             conn.close()
         return False
-
-
-def verificar_e_corrigir_estrutura_tabelas(cursor, conn):
-    """Verificar e corrigir estrutura das tabelas existentes"""
-
-    try:
-        # Verificar se coluna status existe na tabela pedidos
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM information_schema.columns 
-            WHERE table_name = 'pedidos' AND column_name = 'status'
-        """)
-        tem_status = cursor.fetchone()[0] > 0
-
-        if not tem_status:
-            print("➕ Adicionando coluna 'status' na tabela pedidos")
-            cursor.execute("""
-                ALTER TABLE pedidos 
-                ADD COLUMN status VARCHAR(20) DEFAULT 'ATIVO'
-            """)
-
-        # Verificar outras colunas necessárias
-        colunas_necessarias = [
-            ('items', 'TEXT'),
-            ('data_entrega', 'DATE'),
-            ('desconto', 'DECIMAL(5,2) DEFAULT 0'),
-            ('frete', 'DECIMAL(10,2) DEFAULT 0')
-        ]
-
-        for nome_coluna, tipo_coluna in colunas_necessarias:
-            cursor.execute("""
-                SELECT COUNT(*) 
-                FROM information_schema.columns 
-                WHERE table_name = 'pedidos' AND column_name = %s
-            """, (nome_coluna,))
-
-            existe = cursor.fetchone()[0] > 0
-
-            if not existe:
-                print(
-                    f"➕ Adicionando coluna '{nome_coluna}' na tabela pedidos")
-                cursor.execute(f"""
-                    ALTER TABLE pedidos 
-                    ADD COLUMN {nome_coluna} {tipo_coluna}
-                """)
-
-        conn.commit()
-        print("✅ Estrutura das tabelas verificada e corrigida")
-
-    except Exception as e:
-        print(f"⚠️  Erro ao corrigir estrutura: {e}")
-        conn.rollback()
 
 
 def inserir_dados_iniciais(cursor, conn):
@@ -483,10 +444,9 @@ def buscar_precos_normal():
 
 def salvar_pedido(dados_pedido):
     """Salvar pedido no banco de dados"""
-
     conn = conectar_postgresql()
     if not conn:
-        return {'success': False, 'error': 'Erro de conexão com banco'}
+        return None
 
     try:
         cursor = conn.cursor()
@@ -494,97 +454,69 @@ def salvar_pedido(dados_pedido):
         # Obter próximo número do pedido
         numero_pedido = obter_proximo_numero_pedido()
         if not numero_pedido:
-            return {'success': False, 'error': 'Erro ao gerar número do pedido'}
+            raise Exception("Não foi possível gerar número do pedido")
 
-        # Preparar dados do pedido
-        pedido = {
-            'numero_pedido': numero_pedido,
-            'cnpj_cliente': dados_pedido.get('cnpj_cliente'),
-            'representante': dados_pedido.get('representante'),
-            'observacoes': dados_pedido.get('observacoes', ''),
-            'valor_total': dados_pedido.get('valor_total', 0)
-        }
-
-        # Inserir pedido
+        # Inserir pedido principal
         cursor.execute("""
-            INSERT INTO pedidos (numero_pedido, cnpj_cliente, representante, observacoes, valor_total)
-            VALUES (%(numero_pedido)s, %(cnpj_cliente)s, %(representante)s, %(observacoes)s, %(valor_total)s)
-            RETURNING id, numero_pedido, created_at
-        """, pedido)
+            INSERT INTO pedidos (
+                numero_pedido, nome_representante, cnpj_cliente, razao_social_cliente, 
+                telefone_cliente, prazo_pagamento, tipo_pedido, numero_op, tipo_frete,
+                transportadora_fob, transportadora_cif, venda_triangular, dados_triangulacao,
+                regime_ret, tipo_produto, tabela_precos, valor_total, observacoes
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+            ) RETURNING id
+        """, (
+            numero_pedido,
+            dados_pedido['nomeRepresentante'],
+            dados_pedido['cnpj'],
+            dados_pedido['razaoSocial'],
+            dados_pedido['telefone'],
+            dados_pedido['prazoPagamento'],
+            dados_pedido['tipoPedido'],
+            dados_pedido.get('numeroOP', ''),
+            dados_pedido['tipoFrete'],
+            dados_pedido.get('transportadoraFOB', ''),
+            dados_pedido.get('transportadoraCIF', ''),
+            dados_pedido['vendaTriangular'],
+            dados_pedido.get('dadosTriangulacao', ''),
+            dados_pedido['regimeRET'],
+            dados_pedido['tipoProduto'],
+            dados_pedido.get('tabelaPrecos', ''),
+            dados_pedido['valorTotal'],
+            dados_pedido.get('observacoes', '')
+        ))
 
-        resultado = cursor.fetchone()
+        pedido_id = cursor.fetchone()[0]
+
+        # Inserir itens do pedido
+        for item in dados_pedido['produtos']:
+            cursor.execute("""
+                INSERT INTO itens_pedido (
+                    pedido_id, numero_pedido, artigo, codigo, desenho_cor, 
+                    metragem, preco_metro, subtotal
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                pedido_id,
+                numero_pedido,
+                item['artigo'],
+                item['codigo'],
+                item['desenho_cor'],
+                item['metragem'],
+                item['preco'],
+                item['subtotal']
+            ))
+
         conn.commit()
-
-        pedido_criado = {
-            'id': resultado[0],
-            'numero_pedido': resultado[1],
-            'cnpj_cliente': pedido['cnpj_cliente'],
-            'representante': pedido['representante'],
-            'observacoes': pedido['observacoes'],
-            'valor_total': float(pedido['valor_total']),
-            'created_at': resultado[2].isoformat()
-        }
-
         cursor.close()
         conn.close()
 
-        return {'success': True, 'pedido': pedido_criado}
+        return numero_pedido
 
     except Exception as e:
         print(f"Erro ao salvar pedido: {e}")
         if conn:
             conn.rollback()
-            conn.close()
-        return {'success': False, 'error': str(e)}
-
-
-def buscar_pedidos():
-    """Buscar todos os pedidos"""
-    conn = conectar_postgresql()
-    if not conn:
-        return []
-
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT p.numero_pedido, p.cnpj_cliente, c.razao_social, p.representante, 
-                   p.valor_total, p.created_at
-            FROM pedidos p
-            LEFT JOIN clientes c ON p.cnpj_cliente = c.cnpj
-            ORDER BY p.created_at DESC
-        """)
-        pedidos = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return pedidos
-    except Exception as e:
-        print(f"Erro ao buscar pedidos: {e}")
-        if conn:
-            conn.close()
-        return []
-
-
-def buscar_pedido_por_numero(numero_pedido):
-    """Buscar pedido específico por número"""
-    conn = conectar_postgresql()
-    if not conn:
-        return None
-
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT p.*, c.razao_social, c.nome_fantasia
-            FROM pedidos p
-            LEFT JOIN clientes c ON p.cnpj_cliente = c.cnpj
-            WHERE p.numero_pedido = %s
-        """, (numero_pedido,))
-        pedido = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        return pedido
-    except Exception as e:
-        print(f"Erro ao buscar pedido: {e}")
-        if conn:
             conn.close()
         return None
 
@@ -619,7 +551,7 @@ def home():
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             text-align: center;
-            max-width: 600px;
+            max-width: 500px;
             width: 90%;
         }
         h1 {
@@ -647,7 +579,7 @@ def home():
             padding: 12px 30px;
             text-decoration: none;
             border-radius: 25px;
-            margin: 5px;
+            margin: 10px;
             transition: all 0.3s ease;
             font-weight: bold;
         }
@@ -655,9 +587,12 @@ def home():
             background: #5a6fd8;
             transform: translateY(-2px);
         }
-        .btn.success { background: #28a745; }
-        .btn.info { background: #17a2b8; }
-        .btn.warning { background: #ffc107; color: #333; }
+        .btn-primary {
+            background: #1a5490;
+        }
+        .btn-primary:hover {
+            background: #134072;
+        }
         .info {
             background: #f8f9ff;
             padding: 20px;
@@ -692,29 +627,26 @@ def home():
 <body>
     <div class="container">
         <h1>🏭 DESIGNTEX TECIDOS</h1>
-        <p class="subtitle">Sistema de Pedidos - PostgreSQL Railway</p>
+        <p class="subtitle">Sistema de Pedidos - PostgreSQL</p>
         
         <div class="status">
-            ✅ PostgreSQL Railway Conectado e Funcionando
+            ✅ PostgreSQL Conectado e Funcionando
         </div>
         
-        <!-- Botões de teste -->
+        <a href="/novo-pedido" class="btn btn-primary">📝 NOVO PEDIDO</a>
         <a href="/health" class="btn">🔍 Health Check</a>
         <a href="/clientes" class="btn">👥 Ver Clientes</a>
         <a href="/precos" class="btn">💰 Ver Preços</a>
-        <a href="/pedidos" class="btn success">📋 Ver Pedidos</a>
-        <a href="/teste-pedido" class="btn warning">🧪 Criar Pedido Teste</a>
         
         <div class="info">
             <h3>📋 Endpoints Disponíveis:</h3>
             <ul class="endpoints">
+                <li><code>GET /novo-pedido</code> - Formulário de pedidos</li>
                 <li><code>GET /health</code> - Status do sistema</li>
                 <li><code>GET /clientes</code> - Lista de clientes</li>
                 <li><code>GET /precos</code> - Tabela de preços</li>
-                <li><code>GET /pedidos</code> - Lista de pedidos</li>
-                <li><code>POST /pedidos</code> - Criar novo pedido</li>
-                <li><code>GET /pedidos/{numero}</code> - Obter pedido específico</li>
-                <li><code>GET /teste-pedido</code> - Criar pedido de teste</li>
+                <li><code>POST /submit_pedido</code> - Criar pedido</li>
+                <li><code>GET /api/buscar_clientes</code> - Busca clientes</li>
             </ul>
         </div>
         
@@ -730,317 +662,7 @@ def home():
 </html>
     ''')
 
-
 # NOVO ENDPOINT - FORMULÁRIO DE PEDIDOS
-
-
-def criar_tabela_pedidos_completa():
-    """Criar/atualizar tabela pedidos com estrutura completa"""
-
-    conn = conectar_postgresql()
-    if not conn:
-        return False
-
-    try:
-        cursor = conn.cursor()
-
-        # Dropar tabela antiga se existir (para recriar com nova estrutura)
-        cursor.execute("DROP TABLE IF EXISTS pedidos CASCADE")
-
-        # Criar tabela completa
-        cursor.execute("""
-            CREATE TABLE pedidos (
-                id SERIAL PRIMARY KEY,
-                numero_pedido VARCHAR(10) UNIQUE NOT NULL,
-                
-                -- REPRESENTANTE
-                nome_representante VARCHAR(100) NOT NULL,
-                
-                -- CLIENTE
-                cnpj_cliente VARCHAR(18) NOT NULL,
-                razao_social_cliente VARCHAR(200) NOT NULL,
-                telefone_cliente VARCHAR(20),
-                
-                -- CONDIÇÕES COMERCIAIS
-                prazo_pagamento VARCHAR(50),
-                tipo_pedido VARCHAR(20) CHECK (tipo_pedido IN ('NORMAL', 'ESPECIAL')),
-                numero_op VARCHAR(50),
-                
-                -- FRETE
-                tipo_frete VARCHAR(10) CHECK (tipo_frete IN ('FOB', 'CIF')),
-                transportadora_fob VARCHAR(100),
-                transportadora_cif VARCHAR(100),
-                
-                -- VENDA TRIANGULAR
-                venda_triangular BOOLEAN DEFAULT FALSE,
-                dados_triangulacao TEXT,
-                
-                -- REGIME E PRODUTO
-                regime_ret VARCHAR(20) CHECK (regime_ret IN ('RET', 'NORMAL')),
-                tipo_produto VARCHAR(20) CHECK (tipo_produto IN ('NORMAL', 'LD')),
-                tabela_precos VARCHAR(10) CHECK (tabela_precos IN ('NORMAL', 'LD')),
-                
-                -- FINANCEIRO
-                valor_total DECIMAL(12,2) DEFAULT 0.00,
-                
-                -- OBSERVAÇÕES
-                observacoes TEXT,
-                
-                -- CONTROLE
-                status VARCHAR(20) DEFAULT 'ATIVO',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-
-        # Criar índices para performance
-        cursor.execute(
-            "CREATE INDEX idx_pedidos_numero ON pedidos(numero_pedido)")
-        cursor.execute(
-            "CREATE INDEX idx_pedidos_cnpj ON pedidos(cnpj_cliente)")
-        cursor.execute(
-            "CREATE INDEX idx_pedidos_representante ON pedidos(nome_representante)")
-        cursor.execute("CREATE INDEX idx_pedidos_data ON pedidos(created_at)")
-
-        conn.commit()
-        print("✅ Tabela pedidos criada com estrutura completa!")
-
-        cursor.close()
-        conn.close()
-        return True
-
-    except Exception as e:
-        print(f"❌ Erro ao criar tabela pedidos: {e}")
-        if conn:
-            conn.rollback()
-            conn.close()
-        return False
-
-
-def inserir_pedido_completo(dados_pedido):
-    """Inserir pedido com todos os campos"""
-
-    conn = conectar_postgresql()
-    if not conn:
-        return None
-
-    try:
-        cursor = conn.cursor()
-
-        # Gerar número do pedido
-        numero_pedido = obter_proximo_numero_pedido()
-        if not numero_pedido:
-            return None
-
-        # Inserir pedido
-        cursor.execute("""
-            INSERT INTO pedidos (
-                numero_pedido, nome_representante, cnpj_cliente, razao_social_cliente, 
-                telefone_cliente, prazo_pagamento, tipo_pedido, numero_op, tipo_frete,
-                transportadora_fob, transportadora_cif, venda_triangular, dados_triangulacao,
-                regime_ret, tipo_produto, tabela_precos, valor_total, observacoes
-            ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-            ) RETURNING id
-        """, (
-            numero_pedido,
-            dados_pedido.get('nome_representante'),
-            dados_pedido.get('cnpj_cliente'),
-            dados_pedido.get('razao_social_cliente'),
-            dados_pedido.get('telefone_cliente'),
-            dados_pedido.get('prazo_pagamento'),
-            dados_pedido.get('tipo_pedido', 'NORMAL'),
-            dados_pedido.get('numero_op'),
-            dados_pedido.get('tipo_frete'),
-            dados_pedido.get('transportadora_fob'),
-            dados_pedido.get('transportadora_cif'),
-            dados_pedido.get('venda_triangular', False),
-            dados_pedido.get('dados_triangulacao'),
-            dados_pedido.get('regime_ret'),
-            dados_pedido.get('tipo_produto'),
-            dados_pedido.get('tabela_precos'),
-            dados_pedido.get('valor_total', 0.00),
-            dados_pedido.get('observacoes')
-        ))
-
-        pedido_id = cursor.fetchone()[0]
-
-        conn.commit()
-        cursor.close()
-        conn.close()
-
-        print(f"✅ Pedido {numero_pedido} inserido com ID: {pedido_id}")
-
-        return {
-            'id': pedido_id,
-            'numero_pedido': numero_pedido,
-            'status': 'success'
-        }
-
-    except Exception as e:
-        print(f"❌ Erro ao inserir pedido: {e}")
-        if conn:
-            conn.rollback()
-            conn.close()
-        return None
-
-
-@app.route('/pedidos', methods=['POST'])
-def criar_pedido():
-    """Criar novo pedido via API"""
-
-    try:
-        dados = request.get_json()
-
-        # Validações básicas
-        campos_obrigatorios = [
-            'nome_representante', 'cnpj_cliente', 'razao_social_cliente'
-        ]
-
-        for campo in campos_obrigatorios:
-            if not dados.get(campo):
-                return jsonify({
-                    'error': f'Campo obrigatório: {campo}',
-                    'status': 'error'
-                }), 400
-
-        # Inserir pedido
-        resultado = inserir_pedido_completo(dados)
-
-        if resultado:
-            return jsonify({
-                'message': 'Pedido criado com sucesso',
-                'pedido': resultado,
-                'status': 'success'
-            }), 201
-        else:
-            return jsonify({
-                'error': 'Falha ao criar pedido',
-                'status': 'error'
-            }), 500
-
-    except Exception as e:
-        return jsonify({
-            'error': f'Erro interno: {str(e)}',
-            'status': 'error'
-        }), 500
-
-
-@app.route('/pedidos', methods=['GET'])
-def listar_pedidos():
-    """Listar pedidos com paginação"""
-
-    try:
-        # Parâmetros de paginação
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
-
-        conn = conectar_postgresql()
-        if not conn:
-            return jsonify({'error': 'Erro de conexão'}), 500
-
-        cursor = conn.cursor()
-
-        # Contar total
-        cursor.execute("SELECT COUNT(*) FROM pedidos WHERE status = 'ATIVO'")
-        total = cursor.fetchone()[0]
-
-        # Buscar pedidos com paginação
-        offset = (page - 1) * per_page
-        cursor.execute("""
-            SELECT 
-                id, numero_pedido, nome_representante, cnpj_cliente, 
-                razao_social_cliente, valor_total, created_at
-            FROM pedidos 
-            WHERE status = 'ATIVO'
-            ORDER BY created_at DESC
-            LIMIT %s OFFSET %s
-        """, (per_page, offset))
-
-        pedidos = cursor.fetchall()
-
-        pedidos_json = []
-        for pedido in pedidos:
-            pedidos_json.append({
-                'id': pedido[0],
-                'numero_pedido': pedido[1],
-                'representante': pedido[2],
-                'cnpj_cliente': pedido[3],
-                'razao_social': pedido[4],
-                'valor_total': float(pedido[5]) if pedido[5] else 0,
-                'created_at': pedido[6].isoformat() if pedido[6] else None
-            })
-
-        cursor.close()
-        conn.close()
-
-        return jsonify({
-            'pedidos': pedidos_json,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': total,
-                'pages': (total + per_page - 1) // per_page
-            }
-        })
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/pedidos/<numero_pedido>')
-def buscar_pedido(numero_pedido):
-    """Buscar pedido específico por número"""
-
-    try:
-        conn = conectar_postgresql()
-        if not conn:
-            return jsonify({'error': 'Erro de conexão'}), 500
-
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT * FROM pedidos 
-            WHERE numero_pedido = %s AND status = 'ATIVO'
-        """, (numero_pedido,))
-
-        pedido = cursor.fetchone()
-
-        if not pedido:
-            return jsonify({'error': 'Pedido não encontrado'}), 404
-
-        # Estruturar dados do pedido
-        pedido_json = {
-            'id': pedido[0],
-            'numero_pedido': pedido[1],
-            'representante': pedido[2],
-            'cnpj_cliente': pedido[3],
-            'razao_social_cliente': pedido[4],
-            'telefone_cliente': pedido[5],
-            'prazo_pagamento': pedido[6],
-            'tipo_pedido': pedido[7],
-            'numero_op': pedido[8],
-            'tipo_frete': pedido[9],
-            'transportadora_fob': pedido[10],
-            'transportadora_cif': pedido[11],
-            'venda_triangular': pedido[12],
-            'dados_triangulacao': pedido[13],
-            'regime_ret': pedido[14],
-            'tipo_produto': pedido[15],
-            'tabela_precos': pedido[16],
-            'valor_total': float(pedido[17]) if pedido[17] else 0,
-            'observacoes': pedido[18],
-            'status': pedido[19],
-            'created_at': pedido[20].isoformat() if pedido[20] else None,
-            'updated_at': pedido[21].isoformat() if pedido[21] else None
-        }
-
-        cursor.close()
-        conn.close()
-
-        return jsonify(pedido_json)
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/novo-pedido')
@@ -1893,123 +1515,18 @@ def listar_precos():
     })
 
 
-@app.route('/pedidos', methods=['GET', 'POST'])
-def gerenciar_pedidos():
-    """Gerenciar pedidos - listar ou criar"""
-
-    if request.method == 'GET':
-        # Listar pedidos
-        pedidos = buscar_pedidos()
-        pedidos_json = []
-
-        for pedido in pedidos:
-            pedidos_json.append({
-                'numero_pedido': pedido[0],
-                'cnpj_cliente': pedido[1],
-                'razao_social': pedido[2] or 'Cliente não encontrado',
-                'representante': pedido[3],
-                'valor_total': float(pedido[4]) if pedido[4] else 0,
-                'data_criacao': pedido[5].isoformat() if pedido[5] else None
-            })
-
-        return jsonify({
-            'pedidos': pedidos_json,
-            'total': len(pedidos_json)
-        })
-
-    elif request.method == 'POST':
-        # Criar novo pedido
-        try:
-            dados = request.get_json()
-
-            if not dados:
-                return jsonify({'error': 'Dados não fornecidos'}), 400
-
-            # Validações básicas
-            campos_obrigatorios = ['cnpj_cliente', 'representante']
-            for campo in campos_obrigatorios:
-                if campo not in dados or not dados[campo]:
-                    return jsonify({'error': f'Campo obrigatório: {campo}'}), 400
-
-            # Salvar pedido
-            resultado = salvar_pedido(dados)
-
-            if resultado['success']:
-                return jsonify(resultado['pedido']), 201
-            else:
-                return jsonify({'error': resultado['error']}), 500
-
-        except Exception as e:
-            return jsonify({'error': f'Erro ao processar pedido: {str(e)}'}), 500
-
-
-@app.route('/pedidos/<numero_pedido>')
-def obter_pedido(numero_pedido):
-    """Obter pedido específico"""
-    pedido = buscar_pedido_por_numero(numero_pedido)
-
-    if not pedido:
-        return jsonify({'error': 'Pedido não encontrado'}), 404
-
-    pedido_json = {
-        'id': pedido[0],
-        'numero_pedido': pedido[1],
-        'cnpj_cliente': pedido[2],
-        'representante': pedido[3],
-        'observacoes': pedido[4],
-        'valor_total': float(pedido[5]) if pedido[5] else 0,
-        'created_at': pedido[6].isoformat() if pedido[6] else None,
-        'razao_social': pedido[7],
-        'nome_fantasia': pedido[8]
-    }
-
-    return jsonify(pedido_json)
-
-
-@app.route('/teste-pedido')
-def teste_criar_pedido():
-    """Endpoint para testar criação de pedido"""
-
-    dados_teste = {
-        'cnpj_cliente': '12.345.678/0001-90',
-        'representante': 'REPRESENTANTE TESTE',
-        'observacoes': 'Pedido criado via teste do sistema',
-        'valor_total': 2500.75
-    }
-
-    resultado = salvar_pedido(dados_teste)
-
-    if resultado['success']:
-        return jsonify({
-            'message': 'Pedido de teste criado com sucesso!',
-            'pedido': resultado['pedido']
-        })
-    else:
-        return jsonify({
-            'error': 'Erro ao criar pedido de teste',
-            'details': resultado['error']
-        }), 500
-
-
 if __name__ == '__main__':
-    # Configuração para Railway deploy
-    port = int(os.environ.get('PORT', 5001))
-
     # Inicializar banco de dados
     if init_database():
-        print("🚀 Iniciando DESIGNTEX TECIDOS - Railway Deploy")
         print("🚀 Iniciando DESIGNTEX TECIDOS - PostgreSQL Web")
-        print(f"📡 Servidor rodando na porta: {port}")
-        print("🔗 Endpoints disponíveis:")
+        print("📡 Servidor rodando em: http://127.0.0.1:5001")
         print("📝 Novo pedido: http://127.0.0.1:5001/novo-pedido")
         print("🔗 Health check: http://127.0.0.1:5001/health")
         print("👥 Clientes: http://127.0.0.1:5001/clientes")
         print("💰 Preços: http://127.0.0.1:5001/precos")
         print("-" * 50)
 
-      # Railway usa PORT environment variable
-        app.run(host='0.0.0.0', port=port, debug=False)
+        app.run(host='0.0.0.0', port=5001, debug=True)
     else:
         print("❌ Falha na inicialização do banco de dados")
         print("🔧 Verifique as configurações do PostgreSQL")
-        sys.exit(1)

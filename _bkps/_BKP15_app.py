@@ -2,13 +2,12 @@ import os
 import sys
 import locale
 import psycopg2
-from flask import Flask, render_template_string, request, jsonify, send_file
+from flask import Flask, render_template_string, request, jsonify, send_file, render_template
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 import io
-import json
 
 # CONFIGURAR ENCODING DO SISTEMA ANTES DE TUDO
 
@@ -16,17 +15,14 @@ import json
 def configurar_encoding():
     """Configurar encoding do sistema"""
     try:
-        # Windows
         if sys.platform.startswith('win'):
             os.system('chcp 65001 > nul')
 
-        # Configurar variáveis de ambiente
         os.environ['PYTHONIOENCODING'] = 'utf-8'
-        os.environ['PGCLIENTENCODING'] = 'SQL_ASCII'  # Mais compatível
+        os.environ['PGCLIENTENCODING'] = 'SQL_ASCII'
 
-        # Configurar locale
         try:
-            locale.setlocale(locale.LC_ALL, 'C')  # Mais seguro
+            locale.setlocale(locale.LC_ALL, 'C')
         except:
             pass
 
@@ -39,75 +35,85 @@ def configurar_encoding():
 # Executar configuração de encoding
 configurar_encoding()
 
-# CONFIGURAÇÃO DO POSTGRESQL - CORRIGIDA
-DATABASE_CONFIG = {
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'database': os.getenv('DB_NAME', 'designtex_db'),
-    'user': os.getenv('DB_USER', 'postgres'),
-    'password': os.getenv('DB_PASSWORD', 'samuca88'),
-    'port': os.getenv('DB_PORT', '5432'),
-    'client_encoding': 'UTF8',
-    'connect_timeout': 30
-}
+# CONFIGURAÇÃO FLEXÍVEL DE BANCO DE DADOS
+
+
+def get_database_config():
+    """Obter configuração do banco baseada no ambiente"""
+
+    environment = os.getenv('ENVIRONMENT', 'development')
+    database_url = os.getenv('DATABASE_URL')
+
+    if environment == 'production' or database_url:
+        print("🌐 Configuração RAILWAY (Produção)")
+        if database_url:
+            return {'database_url': database_url}
+        else:
+            return {
+                'host': os.getenv('RAILWAY_DB_HOST'),
+                'database': os.getenv('RAILWAY_DB_NAME', 'railway'),
+                'user': os.getenv('RAILWAY_DB_USER', 'postgres'),
+                'password': os.getenv('RAILWAY_DB_PASSWORD'),
+                'port': os.getenv('RAILWAY_DB_PORT', '5432'),
+                'client_encoding': 'UTF8',
+                'connect_timeout': 30
+            }
+    else:
+        print("🏠 Configuração LOCAL (Desenvolvimento)")
+        return {
+            'host': os.getenv('LOCAL_DB_HOST', 'localhost'),
+            'database': os.getenv('LOCAL_DB_NAME', 'designtex_db'),
+            'user': os.getenv('LOCAL_DB_USER', 'postgres'),
+            'password': os.getenv('LOCAL_DB_PASSWORD', 'samuca88'),
+            'port': os.getenv('LOCAL_DB_PORT', '5432'),
+            'client_encoding': 'UTF8',
+            'connect_timeout': 30
+        }
+
+
+# Obter configuração do banco
+DATABASE_CONFIG = get_database_config()
 
 
 def conectar_postgresql():
-    """Conectar ao PostgreSQL com tratamento robusto de encoding"""
+    """Conectar ao PostgreSQL (local ou Railway)"""
 
-    # Lista de encodings para tentar
     encodings_para_testar = ['UTF8', 'LATIN1', 'WIN1252', 'SQL_ASCII']
 
     for encoding in encodings_para_testar:
         try:
             print(f"🔄 Tentando conectar com encoding: {encoding}")
 
-            # Configuração com encoding específico
-            config = {
-                'host': os.getenv('DB_HOST', 'localhost'),
-                'database': os.getenv('DB_NAME', 'designtex_db'),
-                'user': os.getenv('DB_USER', 'postgres'),
-                'password': os.getenv('DB_PASSWORD', 'samuca88'),
-                'port': os.getenv('DB_PORT', '5432'),
-                'client_encoding': encoding,
-                'connect_timeout': 30
-            }
+            if 'database_url' in DATABASE_CONFIG:
+                database_url = DATABASE_CONFIG['database_url']
 
-            # Tentar conectar
-            conn = psycopg2.connect(**config)
+                if '?' in database_url:
+                    database_url += f'&client_encoding={encoding}'
+                else:
+                    database_url += f'?client_encoding={encoding}'
 
-            # Configurar encoding após conexão
+                conn = psycopg2.connect(database_url)
+
+            else:
+                config = DATABASE_CONFIG.copy()
+                config['client_encoding'] = encoding
+                conn = psycopg2.connect(**config)
+
             conn.set_client_encoding(encoding)
 
-            # Testar conexão com query simples
             cursor = conn.cursor()
             cursor.execute('SELECT version();')
             resultado = cursor.fetchone()
             cursor.close()
 
             print(f"✅ Conectado com sucesso usando encoding: {encoding}")
-            print(f"📋 PostgreSQL Version: {str(resultado[0])[:50]}...")
+            print(f"📋 PostgreSQL: {str(resultado[0])[:60]}...")
 
             return conn
 
-        except UnicodeDecodeError as e:
-            print(f"❌ Erro de encoding {encoding}: {str(e)[:100]}...")
-            if 'conn' in locals():
-                conn.close()
-            continue
-
-        except psycopg2.OperationalError as e:
-            error_msg = str(e)
-            if 'codec' in error_msg or 'decode' in error_msg:
-                print(f"❌ Erro de encoding {encoding}: {error_msg[:100]}...")
-                if 'conn' in locals():
-                    conn.close()
-                continue
-            else:
-                print(f"❌ Erro de conexão (não é encoding): {error_msg}")
-                return None
-
         except Exception as e:
-            print(f"❌ Erro geral com encoding {encoding}: {str(e)[:100]}...")
+            error_msg = str(e)
+            print(f"❌ Erro com encoding {encoding}: {error_msg[:80]}...")
             if 'conn' in locals():
                 conn.close()
             continue
@@ -129,7 +135,6 @@ def init_database():
     try:
         cursor = conn.cursor()
 
-        # Configurar encoding da sessão (modo compatível)
         try:
             cursor.execute("SET client_encoding TO 'SQL_ASCII';")
             cursor.execute("SET standard_conforming_strings TO on;")
@@ -137,7 +142,6 @@ def init_database():
         except:
             print("⚠️  Usando encoding padrão do servidor")
 
-        # Verificar se as tabelas já existem
         cursor.execute("""
             SELECT table_name FROM information_schema.tables 
             WHERE table_schema = 'public'
@@ -147,15 +151,10 @@ def init_database():
         if tabelas_existentes:
             print(
                 f"✅ Banco já inicializado com {len(tabelas_existentes)} tabelas")
-
-            # Verificar e corrigir estrutura das tabelas
-            verificar_e_corrigir_estrutura_tabelas(cursor, conn)
-
             cursor.close()
             conn.close()
             return True
 
-        # Criar tabelas com estrutura completa
         print("📋 Criando tabelas...")
 
         # Tabela clientes
@@ -166,45 +165,50 @@ def init_database():
                 razao_social VARCHAR(200) NOT NULL,
                 nome_fantasia VARCHAR(150),
                 telefone VARCHAR(20),
-                email VARCHAR(100),
-                endereco VARCHAR(200),
-                cidade VARCHAR(100),
-                estado VARCHAR(2),
-                cep VARCHAR(10),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
-        # Tabela pedidos - ESTRUTURA COMPLETA
+        # Tabela pedidos - ATUALIZADA com novos campos
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS pedidos (
                 id SERIAL PRIMARY KEY,
                 numero_pedido VARCHAR(10) UNIQUE NOT NULL,
                 cnpj_cliente VARCHAR(18),
+                razao_social_cliente VARCHAR(200),
                 representante VARCHAR(100),
+                telefone VARCHAR(20),
+                prazo_pagamento VARCHAR(50),
+                tipo_pedido VARCHAR(10),
+                numero_op VARCHAR(50),
+                tipo_frete VARCHAR(10),
+                transportadora_fob TEXT,
+                transportadora_cif TEXT,
+                venda_triangular VARCHAR(10),
+                dados_triangulacao TEXT,
+                regime_ret VARCHAR(10),
+                tipo_produto VARCHAR(20),
+                tabela_precos VARCHAR(50),
                 observacoes TEXT,
                 valor_total DECIMAL(10,2),
                 status VARCHAR(20) DEFAULT 'ATIVO',
-                items TEXT,
-                data_entrega DATE,
-                desconto DECIMAL(5,2) DEFAULT 0,
-                frete DECIMAL(10,2) DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
-        # Tabela itens do pedido
+        # Tabela itens_pedido - NOVA
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS pedido_items (
+            CREATE TABLE IF NOT EXISTS itens_pedido (
                 id SERIAL PRIMARY KEY,
-                pedido_id INTEGER REFERENCES pedidos(id) ON DELETE CASCADE,
-                artigo VARCHAR(50),
-                codigo VARCHAR(20),
-                descricao VARCHAR(200),
-                quantidade DECIMAL(10,2),
-                preco_unitario DECIMAL(10,2),
-                total_item DECIMAL(10,2),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                numero_pedido VARCHAR(10),
+                artigo VARCHAR(100),
+                codigo VARCHAR(50),
+                desenho_cor VARCHAR(100),
+                metragem DECIMAL(10,2),
+                preco_metro DECIMAL(10,2),
+                subtotal DECIMAL(10,2),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (numero_pedido) REFERENCES pedidos(numero_pedido)
             )
         """)
 
@@ -216,7 +220,6 @@ def init_database():
             )
         """)
 
-        # Inserir sequência inicial se não existir
         cursor.execute("""
             INSERT INTO sequencia_pedidos (id, ultimo_numero) 
             VALUES (1, 0) 
@@ -253,7 +256,6 @@ def init_database():
         conn.commit()
         print("✅ Tabelas PostgreSQL criadas com sucesso!")
 
-        # Inserir dados iniciais
         inserir_dados_iniciais(cursor, conn)
 
         cursor.close()
@@ -269,75 +271,22 @@ def init_database():
         return False
 
 
-def verificar_e_corrigir_estrutura_tabelas(cursor, conn):
-    """Verificar e corrigir estrutura das tabelas existentes"""
-
-    try:
-        # Verificar se coluna status existe na tabela pedidos
-        cursor.execute("""
-            SELECT COUNT(*) 
-            FROM information_schema.columns 
-            WHERE table_name = 'pedidos' AND column_name = 'status'
-        """)
-        tem_status = cursor.fetchone()[0] > 0
-
-        if not tem_status:
-            print("➕ Adicionando coluna 'status' na tabela pedidos")
-            cursor.execute("""
-                ALTER TABLE pedidos 
-                ADD COLUMN status VARCHAR(20) DEFAULT 'ATIVO'
-            """)
-
-        # Verificar outras colunas necessárias
-        colunas_necessarias = [
-            ('items', 'TEXT'),
-            ('data_entrega', 'DATE'),
-            ('desconto', 'DECIMAL(5,2) DEFAULT 0'),
-            ('frete', 'DECIMAL(10,2) DEFAULT 0')
-        ]
-
-        for nome_coluna, tipo_coluna in colunas_necessarias:
-            cursor.execute("""
-                SELECT COUNT(*) 
-                FROM information_schema.columns 
-                WHERE table_name = 'pedidos' AND column_name = %s
-            """, (nome_coluna,))
-
-            existe = cursor.fetchone()[0] > 0
-
-            if not existe:
-                print(
-                    f"➕ Adicionando coluna '{nome_coluna}' na tabela pedidos")
-                cursor.execute(f"""
-                    ALTER TABLE pedidos 
-                    ADD COLUMN {nome_coluna} {tipo_coluna}
-                """)
-
-        conn.commit()
-        print("✅ Estrutura das tabelas verificada e corrigida")
-
-    except Exception as e:
-        print(f"⚠️  Erro ao corrigir estrutura: {e}")
-        conn.rollback()
-
-
 def inserir_dados_iniciais(cursor, conn):
     """Inserir dados iniciais com encoding seguro"""
 
     try:
         print("📋 Inserindo clientes iniciais...")
 
-        # Clientes básicos (sem acentos para evitar problemas de encoding)
         clientes = [
             ('12.345.678/0001-90', 'EMPRESA ABC LTDA', 'EMPRESA ABC', '11999990001'),
             ('98.765.432/0001-10', 'COMERCIAL XYZ SA',
              'COMERCIAL XYZ', '11999990002'),
             ('11.222.333/0001-44', 'DISTRIBUIDORA 123 LTDA',
              'DISTRIBUIDORA 123', '11999990003'),
-            ('22.333.444/0001-55', 'CONFECCOES PAULO LTDA',
-             'CONFECCOES PAULO', '11999990004'),
-            ('33.444.555/0001-66', 'TEXTIL MODERNA SA',
-             'TEXTIL MODERNA', '11999990005')
+            ('22.333.444/0001-55', 'CONFECCOES MODELO LTDA',
+             'CONFECCOES MODELO', '11999990004'),
+            ('33.444.555/0001-66', 'TEXTIL NACIONAL SA',
+             'TEXTIL NACIONAL', '11999990005')
         ]
 
         for cnpj, razao, fantasia, telefone in clientes:
@@ -350,41 +299,40 @@ def inserir_dados_iniciais(cursor, conn):
         conn.commit()
         print("✅ Clientes iniciais inseridos!")
 
-        # Preços básicos
         print("📋 Inserindo preços iniciais...")
 
-        precos_normal = [
+        precos = [
             ('ALGODAO 30/1', 'ALG301', 'Tecido algodao 30/1 penteado',
              12.50, 11.80, 11.20, 10.90),
-            ('POLIESTER 150D', 'POL150', 'Tecido poliester 150D microfibra',
+            ('POLIESTER 150D', 'POL150', 'Tecido poliester 150D',
              15.30, 14.60, 13.90, 13.50),
-            ('VISCOSE 40/1', 'VIS401', 'Tecido viscose 40/1 lisa',
-             18.20, 17.40, 16.60, 16.20),
-            ('COTTON 24/1', 'COT241', 'Tecido cotton 24/1 cardado',
-             14.80, 14.10, 13.40, 13.00),
-            ('MODAL 50/1', 'MOD501', 'Tecido modal 50/1 premium',
-             22.50, 21.80, 21.10, 20.70)
+            ('VISCOSE 30/1', 'VIS301', 'Tecido viscose 30/1 lisa',
+             18.20, 17.40, 16.80, 16.30),
+            ('MALHA COTTON', 'MAL001', 'Malha cotton penteada',
+             22.80, 21.90, 21.20, 20.70),
+            ('LYCRA COTTON', 'LYC001', 'Lycra cotton elastano',
+             28.50, 27.30, 26.50, 25.90)
         ]
 
-        for artigo, codigo, desc, p18, p12, p7, ret in precos_normal:
+        for artigo, codigo, desc, p18, p12, p7, ret in precos:
             cursor.execute("""
                 INSERT INTO precos_normal (artigo, codigo, descricao, icms_18, icms_12, icms_7, ret_mg) 
                 VALUES (%s, %s, %s, %s, %s, %s, %s) 
                 ON CONFLICT DO NOTHING
             """, (artigo, codigo, desc, p18, p12, p7, ret))
 
-        # Preços LD
+        # Preços LD (Lista Diferenciada)
         precos_ld = [
             ('ALGODAO 30/1', 'ALG301', 'Tecido algodao 30/1 penteado LD',
-             13.20, 12.50, 11.90, 11.50),
-            ('POLIESTER 150D', 'POL150', 'Tecido poliester 150D microfibra LD',
-             16.00, 15.30, 14.60, 14.20),
-            ('VISCOSE 40/1', 'VIS401', 'Tecido viscose 40/1 lisa LD',
-             19.00, 18.20, 17.40, 17.00),
-            ('COTTON 24/1', 'COT241', 'Tecido cotton 24/1 cardado LD',
-             15.50, 14.80, 14.10, 13.70),
-            ('MODAL 50/1', 'MOD501', 'Tecido modal 50/1 premium LD',
-             23.50, 22.80, 22.10, 21.70)
+             11.20, 10.50, 9.90, 9.60),
+            ('POLIESTER 150D', 'POL150', 'Tecido poliester 150D LD',
+             13.80, 13.10, 12.40, 12.00),
+            ('VISCOSE 30/1', 'VIS301', 'Tecido viscose 30/1 lisa LD',
+             16.40, 15.60, 15.00, 14.70),
+            ('MALHA COTTON', 'MAL001', 'Malha cotton penteada LD',
+             20.50, 19.70, 19.00, 18.60),
+            ('LYCRA COTTON', 'LYC001', 'Lycra cotton elastano LD',
+             25.60, 24.60, 23.80, 23.30)
         ]
 
         for artigo, codigo, desc, p18, p12, p7, ret in precos_ld:
@@ -415,7 +363,7 @@ def obter_proximo_numero_pedido():
         conn.commit()
         cursor.close()
         conn.close()
-        return str(numero).zfill(4)  # Formatar com zeros à esquerda
+        return str(numero).zfill(4)
     except Exception as e:
         print(f"Erro ao obter número do pedido: {e}")
         if conn:
@@ -424,35 +372,37 @@ def obter_proximo_numero_pedido():
         return None
 
 
-def buscar_clientes(query=''):
-    """Buscar clientes com filtro opcional"""
+def buscar_clientes_por_texto(query):
+    """Buscar clientes por texto (autocomplete)"""
     conn = conectar_postgresql()
     if not conn:
         return []
 
     try:
         cursor = conn.cursor()
-
-        if query:
-            cursor.execute("""
-                SELECT cnpj, razao_social, nome_fantasia, telefone 
-                FROM clientes 
-                WHERE UPPER(razao_social) LIKE UPPER(%s) 
-                   OR UPPER(nome_fantasia) LIKE UPPER(%s)
-                   OR cnpj LIKE %s
-                ORDER BY razao_social 
-                LIMIT 10
-            """, (f'%{query}%', f'%{query}%', f'%{query}%'))
-        else:
-            cursor.execute(
-                "SELECT cnpj, razao_social, nome_fantasia, telefone FROM clientes ORDER BY razao_social")
+        cursor.execute("""
+            SELECT cnpj, razao_social, nome_fantasia, telefone 
+            FROM clientes 
+            WHERE UPPER(razao_social) LIKE UPPER(%s) 
+               OR UPPER(nome_fantasia) LIKE UPPER(%s)
+               OR cnpj LIKE %s
+            ORDER BY razao_social
+            LIMIT 10
+        """, (f'%{query}%', f'%{query}%', f'%{query}%'))
 
         clientes = cursor.fetchall()
         cursor.close()
         conn.close()
 
-        return [{'cnpj': c[0], 'razao_social': c[1], 'nome_fantasia': c[2], 'telefone': c[3]} for c in clientes]
-
+        return [
+            {
+                'cnpj': cliente[0],
+                'razao_social': cliente[1],
+                'nome_fantasia': cliente[2],
+                'telefone': cliente[3] or ''
+            }
+            for cliente in clientes
+        ]
     except Exception as e:
         print(f"Erro ao buscar clientes: {e}")
         if conn:
@@ -460,133 +410,86 @@ def buscar_clientes(query=''):
         return []
 
 
-def buscar_precos_normal():
-    """Buscar preços normais"""
+def salvar_pedido(dados):
+    """Salvar pedido completo no banco"""
     conn = conectar_postgresql()
     if not conn:
-        return []
-
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT artigo, codigo, descricao, icms_18, icms_12, icms_7, ret_mg FROM precos_normal ORDER BY artigo")
-        precos = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return precos
-    except Exception as e:
-        print(f"Erro ao buscar preços: {e}")
-        if conn:
-            conn.close()
-        return []
-
-
-def salvar_pedido(dados_pedido):
-    """Salvar pedido no banco de dados"""
-
-    conn = conectar_postgresql()
-    if not conn:
-        return {'success': False, 'error': 'Erro de conexão com banco'}
+        return {'success': False, 'message': 'Erro de conexão com banco'}
 
     try:
         cursor = conn.cursor()
 
-        # Obter próximo número do pedido
+        # Obter número do pedido
         numero_pedido = obter_proximo_numero_pedido()
         if not numero_pedido:
-            return {'success': False, 'error': 'Erro ao gerar número do pedido'}
+            return {'success': False, 'message': 'Erro ao gerar número do pedido'}
 
-        # Preparar dados do pedido
-        pedido = {
-            'numero_pedido': numero_pedido,
-            'cnpj_cliente': dados_pedido.get('cnpj_cliente'),
-            'representante': dados_pedido.get('representante'),
-            'observacoes': dados_pedido.get('observacoes', ''),
-            'valor_total': dados_pedido.get('valor_total', 0)
-        }
-
-        # Inserir pedido
+        # Inserir pedido principal
         cursor.execute("""
-            INSERT INTO pedidos (numero_pedido, cnpj_cliente, representante, observacoes, valor_total)
-            VALUES (%(numero_pedido)s, %(cnpj_cliente)s, %(representante)s, %(observacoes)s, %(valor_total)s)
-            RETURNING id, numero_pedido, created_at
-        """, pedido)
+            INSERT INTO pedidos (
+                numero_pedido, cnpj_cliente, razao_social_cliente, representante,
+                telefone, prazo_pagamento, tipo_pedido, numero_op, tipo_frete,
+                transportadora_fob, transportadora_cif, venda_triangular,
+                dados_triangulacao, regime_ret, tipo_produto, tabela_precos,
+                observacoes, valor_total
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            numero_pedido,
+            dados.get('cnpj', ''),
+            dados.get('razaoSocial', ''),
+            dados.get('nomeRepresentante', ''),
+            dados.get('telefone', ''),
+            dados.get('prazoPagamento', ''),
+            dados.get('tipoPedido', ''),
+            dados.get('numeroOP', ''),
+            dados.get('tipoFrete', ''),
+            dados.get('transportadoraFOB', ''),
+            dados.get('transportadoraCIF', ''),
+            dados.get('vendaTriangular', ''),
+            dados.get('dadosTriangulacao', ''),
+            dados.get('regimeRET', ''),
+            dados.get('tipoProduto', ''),
+            dados.get('tabelaPrecos', ''),
+            dados.get('observacoes', ''),
+            float(dados.get('valorTotal', 0))
+        ))
 
-        resultado = cursor.fetchone()
+        # Inserir itens do pedido
+        for produto in dados.get('produtos', []):
+            cursor.execute("""
+                INSERT INTO itens_pedido (
+                    numero_pedido, artigo, codigo, desenho_cor,
+                    metragem, preco_metro, subtotal
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                numero_pedido,
+                produto.get('artigo', ''),
+                produto.get('codigo', ''),
+                produto.get('desenho_cor', ''),
+                float(produto.get('metragem', 0)),
+                float(produto.get('preco', 0)),
+                float(produto.get('subtotal', 0))
+            ))
+
         conn.commit()
-
-        pedido_criado = {
-            'id': resultado[0],
-            'numero_pedido': resultado[1],
-            'cnpj_cliente': pedido['cnpj_cliente'],
-            'representante': pedido['representante'],
-            'observacoes': pedido['observacoes'],
-            'valor_total': float(pedido['valor_total']),
-            'created_at': resultado[2].isoformat()
-        }
-
         cursor.close()
         conn.close()
 
-        return {'success': True, 'pedido': pedido_criado}
+        print(f"✅ Pedido {numero_pedido} salvo com sucesso!")
+
+        return {
+            'success': True,
+            'message': f'Pedido {numero_pedido} salvo com sucesso!',
+            'numero_pedido': numero_pedido,
+            'valor_total': f"R$ {float(dados.get('valorTotal', 0)):.2f}".replace('.', ',')
+        }
 
     except Exception as e:
-        print(f"Erro ao salvar pedido: {e}")
+        print(f"❌ Erro ao salvar pedido: {e}")
         if conn:
             conn.rollback()
             conn.close()
-        return {'success': False, 'error': str(e)}
-
-
-def buscar_pedidos():
-    """Buscar todos os pedidos"""
-    conn = conectar_postgresql()
-    if not conn:
-        return []
-
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT p.numero_pedido, p.cnpj_cliente, c.razao_social, p.representante, 
-                   p.valor_total, p.created_at
-            FROM pedidos p
-            LEFT JOIN clientes c ON p.cnpj_cliente = c.cnpj
-            ORDER BY p.created_at DESC
-        """)
-        pedidos = cursor.fetchall()
-        cursor.close()
-        conn.close()
-        return pedidos
-    except Exception as e:
-        print(f"Erro ao buscar pedidos: {e}")
-        if conn:
-            conn.close()
-        return []
-
-
-def buscar_pedido_por_numero(numero_pedido):
-    """Buscar pedido específico por número"""
-    conn = conectar_postgresql()
-    if not conn:
-        return None
-
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT p.*, c.razao_social, c.nome_fantasia
-            FROM pedidos p
-            LEFT JOIN clientes c ON p.cnpj_cliente = c.cnpj
-            WHERE p.numero_pedido = %s
-        """, (numero_pedido,))
-        pedido = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        return pedido
-    except Exception as e:
-        print(f"Erro ao buscar pedido: {e}")
-        if conn:
-            conn.close()
-        return None
+        return {'success': False, 'message': f'Erro ao salvar no banco: {str(e)}'}
 
 
 # FLASK APP
@@ -594,469 +497,18 @@ app = Flask(__name__)
 
 
 @app.route('/')
-def home():
-    """Página inicial"""
-    return render_template_string('''
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DESIGNTEX TECIDOS - PostgreSQL</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .container {
-            background: white;
-            padding: 40px;
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 600px;
-            width: 90%;
-        }
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 2.5em;
-        }
-        .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 1.1em;
-        }
-        .status {
-            background: #e8f5e8;
-            color: #2d5f2d;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 20px 0;
-            font-weight: bold;
-        }
-        .btn {
-            display: inline-block;
-            background: #667eea;
-            color: white;
-            padding: 12px 30px;
-            text-decoration: none;
-            border-radius: 25px;
-            margin: 5px;
-            transition: all 0.3s ease;
-            font-weight: bold;
-        }
-        .btn:hover {
-            background: #5a6fd8;
-            transform: translateY(-2px);
-        }
-        .btn.success { background: #28a745; }
-        .btn.info { background: #17a2b8; }
-        .btn.warning { background: #ffc107; color: #333; }
-        .info {
-            background: #f8f9ff;
-            padding: 20px;
-            border-radius: 10px;
-            margin-top: 20px;
-            text-align: left;
-        }
-        .info h3 {
-            color: #667eea;
-            margin-bottom: 10px;
-        }
-        .endpoints {
-            list-style: none;
-            padding: 0;
-        }
-        .endpoints li {
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
-        }
-        .endpoints li:last-child {
-            border-bottom: none;
-        }
-        .endpoints code {
-            background: #667eea;
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.9em;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🏭 DESIGNTEX TECIDOS</h1>
-        <p class="subtitle">Sistema de Pedidos - PostgreSQL Railway</p>
-        
-        <div class="status">
-            ✅ PostgreSQL Railway Conectado e Funcionando
-        </div>
-        
-        <!-- Botões de teste -->
-        <a href="/health" class="btn">🔍 Health Check</a>
-        <a href="/clientes" class="btn">👥 Ver Clientes</a>
-        <a href="/precos" class="btn">💰 Ver Preços</a>
-        <a href="/pedidos" class="btn success">📋 Ver Pedidos</a>
-        <a href="/teste-pedido" class="btn warning">🧪 Criar Pedido Teste</a>
-        
-        <div class="info">
-            <h3>📋 Endpoints Disponíveis:</h3>
-            <ul class="endpoints">
-                <li><code>GET /health</code> - Status do sistema</li>
-                <li><code>GET /clientes</code> - Lista de clientes</li>
-                <li><code>GET /precos</code> - Tabela de preços</li>
-                <li><code>GET /pedidos</code> - Lista de pedidos</li>
-                <li><code>POST /pedidos</code> - Criar novo pedido</li>
-                <li><code>GET /pedidos/{numero}</code> - Obter pedido específico</li>
-                <li><code>GET /teste-pedido</code> - Criar pedido de teste</li>
-            </ul>
-        </div>
-        
-        <div class="info">
-            <h3>🔧 Para Power BI:</h3>
-            <p>Use esta URL como fonte de dados:</p>
-            <code style="background: #2d5f2d; color: white; padding: 8px; border-radius: 4px; display: block; margin-top: 10px;">
-                http://127.0.0.1:5001
-            </code>
-        </div>
-    </div>
-</body>
-</html>
-    ''')
-
-
-# NOVO ENDPOINT - FORMULÁRIO DE PEDIDOS
-
-
-def criar_tabela_pedidos_completa():
-    """Criar/atualizar tabela pedidos com estrutura completa"""
-
-    conn = conectar_postgresql()
-    if not conn:
-        return False
-
-    try:
-        cursor = conn.cursor()
-
-        # Dropar tabela antiga se existir (para recriar com nova estrutura)
-        cursor.execute("DROP TABLE IF EXISTS pedidos CASCADE")
-
-        # Criar tabela completa
-        cursor.execute("""
-            CREATE TABLE pedidos (
-                id SERIAL PRIMARY KEY,
-                numero_pedido VARCHAR(10) UNIQUE NOT NULL,
-                
-                -- REPRESENTANTE
-                nome_representante VARCHAR(100) NOT NULL,
-                
-                -- CLIENTE
-                cnpj_cliente VARCHAR(18) NOT NULL,
-                razao_social_cliente VARCHAR(200) NOT NULL,
-                telefone_cliente VARCHAR(20),
-                
-                -- CONDIÇÕES COMERCIAIS
-                prazo_pagamento VARCHAR(50),
-                tipo_pedido VARCHAR(20) CHECK (tipo_pedido IN ('NORMAL', 'ESPECIAL')),
-                numero_op VARCHAR(50),
-                
-                -- FRETE
-                tipo_frete VARCHAR(10) CHECK (tipo_frete IN ('FOB', 'CIF')),
-                transportadora_fob VARCHAR(100),
-                transportadora_cif VARCHAR(100),
-                
-                -- VENDA TRIANGULAR
-                venda_triangular BOOLEAN DEFAULT FALSE,
-                dados_triangulacao TEXT,
-                
-                -- REGIME E PRODUTO
-                regime_ret VARCHAR(20) CHECK (regime_ret IN ('RET', 'NORMAL')),
-                tipo_produto VARCHAR(20) CHECK (tipo_produto IN ('NORMAL', 'LD')),
-                tabela_precos VARCHAR(10) CHECK (tabela_precos IN ('NORMAL', 'LD')),
-                
-                -- FINANCEIRO
-                valor_total DECIMAL(12,2) DEFAULT 0.00,
-                
-                -- OBSERVAÇÕES
-                observacoes TEXT,
-                
-                -- CONTROLE
-                status VARCHAR(20) DEFAULT 'ATIVO',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-
-        # Criar índices para performance
-        cursor.execute(
-            "CREATE INDEX idx_pedidos_numero ON pedidos(numero_pedido)")
-        cursor.execute(
-            "CREATE INDEX idx_pedidos_cnpj ON pedidos(cnpj_cliente)")
-        cursor.execute(
-            "CREATE INDEX idx_pedidos_representante ON pedidos(nome_representante)")
-        cursor.execute("CREATE INDEX idx_pedidos_data ON pedidos(created_at)")
-
-        conn.commit()
-        print("✅ Tabela pedidos criada com estrutura completa!")
-
-        cursor.close()
-        conn.close()
-        return True
-
-    except Exception as e:
-        print(f"❌ Erro ao criar tabela pedidos: {e}")
-        if conn:
-            conn.rollback()
-            conn.close()
-        return False
-
-
-def inserir_pedido_completo(dados_pedido):
-    """Inserir pedido com todos os campos"""
-
-    conn = conectar_postgresql()
-    if not conn:
-        return None
-
-    try:
-        cursor = conn.cursor()
-
-        # Gerar número do pedido
-        numero_pedido = obter_proximo_numero_pedido()
-        if not numero_pedido:
-            return None
-
-        # Inserir pedido
-        cursor.execute("""
-            INSERT INTO pedidos (
-                numero_pedido, nome_representante, cnpj_cliente, razao_social_cliente, 
-                telefone_cliente, prazo_pagamento, tipo_pedido, numero_op, tipo_frete,
-                transportadora_fob, transportadora_cif, venda_triangular, dados_triangulacao,
-                regime_ret, tipo_produto, tabela_precos, valor_total, observacoes
-            ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-            ) RETURNING id
-        """, (
-            numero_pedido,
-            dados_pedido.get('nome_representante'),
-            dados_pedido.get('cnpj_cliente'),
-            dados_pedido.get('razao_social_cliente'),
-            dados_pedido.get('telefone_cliente'),
-            dados_pedido.get('prazo_pagamento'),
-            dados_pedido.get('tipo_pedido', 'NORMAL'),
-            dados_pedido.get('numero_op'),
-            dados_pedido.get('tipo_frete'),
-            dados_pedido.get('transportadora_fob'),
-            dados_pedido.get('transportadora_cif'),
-            dados_pedido.get('venda_triangular', False),
-            dados_pedido.get('dados_triangulacao'),
-            dados_pedido.get('regime_ret'),
-            dados_pedido.get('tipo_produto'),
-            dados_pedido.get('tabela_precos'),
-            dados_pedido.get('valor_total', 0.00),
-            dados_pedido.get('observacoes')
-        ))
-
-        pedido_id = cursor.fetchone()[0]
-
-        conn.commit()
-        cursor.close()
-        conn.close()
-
-        print(f"✅ Pedido {numero_pedido} inserido com ID: {pedido_id}")
-
-        return {
-            'id': pedido_id,
-            'numero_pedido': numero_pedido,
-            'status': 'success'
-        }
-
-    except Exception as e:
-        print(f"❌ Erro ao inserir pedido: {e}")
-        if conn:
-            conn.rollback()
-            conn.close()
-        return None
-
-
-@app.route('/pedidos', methods=['POST'])
-def criar_pedido():
-    """Criar novo pedido via API"""
-
-    try:
-        dados = request.get_json()
-
-        # Validações básicas
-        campos_obrigatorios = [
-            'nome_representante', 'cnpj_cliente', 'razao_social_cliente'
-        ]
-
-        for campo in campos_obrigatorios:
-            if not dados.get(campo):
-                return jsonify({
-                    'error': f'Campo obrigatório: {campo}',
-                    'status': 'error'
-                }), 400
-
-        # Inserir pedido
-        resultado = inserir_pedido_completo(dados)
-
-        if resultado:
-            return jsonify({
-                'message': 'Pedido criado com sucesso',
-                'pedido': resultado,
-                'status': 'success'
-            }), 201
-        else:
-            return jsonify({
-                'error': 'Falha ao criar pedido',
-                'status': 'error'
-            }), 500
-
-    except Exception as e:
-        return jsonify({
-            'error': f'Erro interno: {str(e)}',
-            'status': 'error'
-        }), 500
-
-
-@app.route('/pedidos', methods=['GET'])
-def listar_pedidos():
-    """Listar pedidos com paginação"""
-
-    try:
-        # Parâmetros de paginação
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
-
-        conn = conectar_postgresql()
-        if not conn:
-            return jsonify({'error': 'Erro de conexão'}), 500
-
-        cursor = conn.cursor()
-
-        # Contar total
-        cursor.execute("SELECT COUNT(*) FROM pedidos WHERE status = 'ATIVO'")
-        total = cursor.fetchone()[0]
-
-        # Buscar pedidos com paginação
-        offset = (page - 1) * per_page
-        cursor.execute("""
-            SELECT 
-                id, numero_pedido, nome_representante, cnpj_cliente, 
-                razao_social_cliente, valor_total, created_at
-            FROM pedidos 
-            WHERE status = 'ATIVO'
-            ORDER BY created_at DESC
-            LIMIT %s OFFSET %s
-        """, (per_page, offset))
-
-        pedidos = cursor.fetchall()
-
-        pedidos_json = []
-        for pedido in pedidos:
-            pedidos_json.append({
-                'id': pedido[0],
-                'numero_pedido': pedido[1],
-                'representante': pedido[2],
-                'cnpj_cliente': pedido[3],
-                'razao_social': pedido[4],
-                'valor_total': float(pedido[5]) if pedido[5] else 0,
-                'created_at': pedido[6].isoformat() if pedido[6] else None
-            })
-
-        cursor.close()
-        conn.close()
-
-        return jsonify({
-            'pedidos': pedidos_json,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': total,
-                'pages': (total + per_page - 1) // per_page
-            }
-        })
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/pedidos/<numero_pedido>')
-def buscar_pedido(numero_pedido):
-    """Buscar pedido específico por número"""
-
-    try:
-        conn = conectar_postgresql()
-        if not conn:
-            return jsonify({'error': 'Erro de conexão'}), 500
-
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT * FROM pedidos 
-            WHERE numero_pedido = %s AND status = 'ATIVO'
-        """, (numero_pedido,))
-
-        pedido = cursor.fetchone()
-
-        if not pedido:
-            return jsonify({'error': 'Pedido não encontrado'}), 404
-
-        # Estruturar dados do pedido
-        pedido_json = {
-            'id': pedido[0],
-            'numero_pedido': pedido[1],
-            'representante': pedido[2],
-            'cnpj_cliente': pedido[3],
-            'razao_social_cliente': pedido[4],
-            'telefone_cliente': pedido[5],
-            'prazo_pagamento': pedido[6],
-            'tipo_pedido': pedido[7],
-            'numero_op': pedido[8],
-            'tipo_frete': pedido[9],
-            'transportadora_fob': pedido[10],
-            'transportadora_cif': pedido[11],
-            'venda_triangular': pedido[12],
-            'dados_triangulacao': pedido[13],
-            'regime_ret': pedido[14],
-            'tipo_produto': pedido[15],
-            'tabela_precos': pedido[16],
-            'valor_total': float(pedido[17]) if pedido[17] else 0,
-            'observacoes': pedido[18],
-            'status': pedido[19],
-            'created_at': pedido[20].isoformat() if pedido[20] else None,
-            'updated_at': pedido[21].isoformat() if pedido[21] else None
-        }
-
-        cursor.close()
-        conn.close()
-
-        return jsonify(pedido_json)
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/novo-pedido')
-def novo_pedido():
+def form_pedido():
     """Página do formulário de pedidos"""
 
-    # Lista de prazos de pagamento
-    prazos_pagamento = [
-        "À Vista",
-        "30 dias",
-        "45 dias",
-        "60 dias",
-        "30/60 dias",
-        "30/60/90 dias",
-        "Faturamento Quinzenal",
-        "Faturamento Mensal"
+    # Prazos de pagamento disponíveis
+    prazos = [
+        'À vista',
+        '30 dias',
+        '60 dias',
+        '90 dias',
+        '30/60 dias',
+        '30/60/90 dias',
+        'Outros'
     ]
 
     return render_template_string('''
@@ -1150,30 +602,11 @@ def novo_pedido():
             background-color: #134072;
             border-color: #134072;
         }
-        
-        .btn-home {
-            background-color: #6c757d;
-            border-color: #6c757d;
-            color: white;
-            text-decoration: none;
-            display: inline-block;
-            padding: 10px 20px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-        
-        .btn-home:hover {
-            background-color: #5a6268;
-            color: white;
-            text-decoration: none;
-        }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <a href="/" class="btn-home">← Voltar ao Início</a>
-        
         <h1 class="header-title">PEDIDO DE VENDAS<br>DESIGNTEX TECIDOS</h1>
 
         <form id="pedidoForm">
@@ -1238,7 +671,6 @@ def novo_pedido():
                             </select>
                         </div>
 
-                        <!-- NOVO: Campo para Número da OP -->
                         <div id="campoNumeroOP" class="col-md-6 mb-3" style="display:none;">
                             <label for="numeroOP" class="form-label">Número da OP *</label>
                             <input type="text" class="form-control" id="numeroOP" placeholder="Digite o número da OP">
@@ -1303,7 +735,7 @@ def novo_pedido():
                 </div>
             </div>
 
-            <!-- PARTE 3 - TABELA DE PREÇOS - CORRIGIDA -->
+            <!-- PARTE 3 - TABELA DE PREÇOS -->
             <div class="card mb-4">
                 <div class="card-header" style="background-color: #1a5490; color: white;">
                     <h5 class="mb-0">💰 TABELA DE PREÇOS</h5>
@@ -1312,28 +744,23 @@ def novo_pedido():
                     <div class="mb-3">
                         <label class="form-label">Selecione a Tabela de Preços *</label>
                         <div class="row">
-                            <!-- CORRIGIDO: Agora é uma seleção única -->
                             <div class="col-md-6">
                                 <div class="border p-3 rounded">
                                     <h6>ICMS Normal</h6>
                                     <div>
-                                        <input type="radio" id="icms18_normal" name="tabelaPrecos" value="ICMS 18%"
-                                            required>
+                                        <input type="radio" id="icms18_normal" name="tabelaPrecos" value="ICMS 18%" required>
                                         <label for="icms18_normal" class="form-check-label me-3">ICMS 18%</label>
                                     </div>
                                     <div>
-                                        <input type="radio" id="icms12_normal" name="tabelaPrecos" value="ICMS 12%"
-                                            required>
+                                        <input type="radio" id="icms12_normal" name="tabelaPrecos" value="ICMS 12%" required>
                                         <label for="icms12_normal" class="form-check-label me-3">ICMS 12%</label>
                                     </div>
                                     <div>
-                                        <input type="radio" id="icms7_normal" name="tabelaPrecos" value="ICMS 7%"
-                                            required>
+                                        <input type="radio" id="icms7_normal" name="tabelaPrecos" value="ICMS 7%" required>
                                         <label for="icms7_normal" class="form-check-label me-3">ICMS 7%</label>
                                     </div>
                                     <div>
-                                        <input type="radio" id="ret_normal" name="tabelaPrecos" value="RET (SOMENTE MG)"
-                                            required>
+                                        <input type="radio" id="ret_normal" name="tabelaPrecos" value="RET (SOMENTE MG)" required>
                                         <label for="ret_normal" class="form-check-label">RET (SOMENTE MG)</label>
                                     </div>
                                 </div>
@@ -1343,23 +770,19 @@ def novo_pedido():
                                 <div class="border p-3 rounded">
                                     <h6>ICMS LD</h6>
                                     <div>
-                                        <input type="radio" id="icms18_ld" name="tabelaPrecos" value="ICMS 18% LD"
-                                            required>
+                                        <input type="radio" id="icms18_ld" name="tabelaPrecos" value="ICMS 18% LD" required>
                                         <label for="icms18_ld" class="form-check-label me-3">ICMS 18% LD</label>
                                     </div>
                                     <div>
-                                        <input type="radio" id="icms12_ld" name="tabelaPrecos" value="ICMS 12% LD"
-                                            required>
+                                        <input type="radio" id="icms12_ld" name="tabelaPrecos" value="ICMS 12% LD" required>
                                         <label for="icms12_ld" class="form-check-label me-3">ICMS 12% LD</label>
                                     </div>
                                     <div>
-                                        <input type="radio" id="icms7_ld" name="tabelaPrecos" value="ICMS 7% LD"
-                                            required>
+                                        <input type="radio" id="icms7_ld" name="tabelaPrecos" value="ICMS 7% LD" required>
                                         <label for="icms7_ld" class="form-check-label me-3">ICMS 7% LD</label>
                                     </div>
                                     <div>
-                                        <input type="radio" id="ret_ld" name="tabelaPrecos" value="RET LD (SOMENTE MG)"
-                                            required>
+                                        <input type="radio" id="ret_ld" name="tabelaPrecos" value="RET LD (SOMENTE MG)" required>
                                         <label for="ret_ld" class="form-check-label">RET LD (SOMENTE MG)</label>
                                     </div>
                                 </div>
@@ -1431,7 +854,6 @@ def novo_pedido():
             const query = e.target.value.trim();
             const dropdown = document.getElementById('autocomplete-dropdown');
 
-            // Limpar timeout anterior
             clearTimeout(timeoutId);
 
             if (query.length < 1) {
@@ -1440,7 +862,6 @@ def novo_pedido():
                 return;
             }
 
-            // Debounce de 300ms
             timeoutId = setTimeout(() => {
                 buscarClientes(query);
             }, 300);
@@ -1504,6 +925,21 @@ def novo_pedido():
         });
 
         // ========== CAMPOS CONDICIONAIS ==========
+        document.getElementById('tipoPedido').addEventListener('change', function () {
+            const tipoPedido = this.value;
+            const campoNumeroOP = document.getElementById('campoNumeroOP');
+            const inputNumeroOP = document.getElementById('numeroOP');
+
+            if (tipoPedido === 'OP') {
+                campoNumeroOP.style.display = 'block';
+                inputNumeroOP.required = true;
+            } else {
+                campoNumeroOP.style.display = 'none';
+                inputNumeroOP.required = false;
+                inputNumeroOP.value = '';
+            }
+        });
+
         document.getElementById('tipoFrete').addEventListener('change', function () {
             const frete = this.value;
             const campoFOB = document.getElementById('campoTransportadoraFOB');
@@ -1531,22 +967,6 @@ def novo_pedido():
             } else {
                 campo.style.display = 'none';
                 document.getElementById('dadosTriangulacao').required = false;
-            }
-        });
-
-        // ========== CAMPO NÚMERO DA OP ==========
-        document.getElementById('tipoPedido').addEventListener('change', function () {
-            const tipoPedido = this.value;
-            const campoNumeroOP = document.getElementById('campoNumeroOP');
-            const inputNumeroOP = document.getElementById('numeroOP');
-
-            if (tipoPedido === 'OP') {
-                campoNumeroOP.style.display = 'block';
-                inputNumeroOP.required = true;
-            } else {
-                campoNumeroOP.style.display = 'none';
-                inputNumeroOP.required = false;
-                inputNumeroOP.value = '';
             }
         });
 
@@ -1637,23 +1057,31 @@ def novo_pedido():
             contador.textContent = this.value.length;
         });
 
-        // ========== VALIDAÇÃO DE FORMULÁRIO ==========
+        // ========== ENVIO DO FORMULÁRIO ==========
+        document.getElementById('pedidoForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            if (!validarFormulario()) {
+                return;
+            }
+
+            const dados = coletarDados();
+            enviarPedido(dados);
+        });
+
         function validarFormulario() {
-            // Validar se tem pelo menos um produto
             const produtos = document.querySelectorAll('.produto-item');
             if (produtos.length === 0) {
                 alert('Adicione pelo menos um produto!');
                 return false;
             }
 
-            // Validar tabela de preços selecionada
             const tabelaPrecos = document.querySelector('input[name="tabelaPrecos"]:checked');
             if (!tabelaPrecos) {
-                alert('Selecione uma tabela de preços (ICMS Normal ou ICMS LD)!');
+                alert('Selecione uma tabela de preços!');
                 return false;
             }
 
-            // Validar número da OP se necessário
             const tipoPedido = document.getElementById('tipoPedido').value;
             const numeroOP = document.getElementById('numeroOP').value;
             if (tipoPedido === 'OP' && !numeroOP.trim()) {
@@ -1662,21 +1090,9 @@ def novo_pedido():
                 return false;
             }
 
-            // Validar se todos os campos obrigatórios estão preenchidos
-            const camposObrigatorios = document.querySelectorAll('[required]');
-            for (let campo of camposObrigatorios) {
-                if (!campo.value.trim()) {
-                    const label = campo.previousElementSibling?.textContent || 'Campo obrigatório';
-                    alert(`Campo obrigatório não preenchido: ${label}`);
-                    campo.focus();
-                    return false;
-                }
-            }
-
             return true;
         }
 
-        // ========== COLETAR DADOS ==========
         function coletarDados() {
             const produtos = [];
             document.querySelectorAll('.produto-item').forEach(produto => {
@@ -1718,18 +1134,6 @@ def novo_pedido():
             };
         }
 
-        // ========== ENVIO DO FORMULÁRIO ==========
-        document.getElementById('pedidoForm').addEventListener('submit', function (e) {
-            e.preventDefault();
-
-            if (!validarFormulario()) {
-                return;
-            }
-
-            const dados = coletarDados();
-            enviarPedido(dados);
-        });
-
         function enviarPedido(dados) {
             const btnEnviar = document.querySelector('button[type="submit"]');
             btnEnviar.disabled = true;
@@ -1746,7 +1150,6 @@ def novo_pedido():
                 .then(data => {
                     if (data.success) {
                         alert(`✅ ${data.message}`);
-                        alert(`📄 Número do pedido: ${data.numero_pedido}`);
                         limparFormulario();
                     } else {
                         alert(`❌ Erro: ${data.message}`);
@@ -1779,49 +1182,44 @@ def novo_pedido():
 </body>
 
 </html>
-    ''', prazos=prazos_pagamento)
+    ''', prazos=prazos)
 
-# API ENDPOINT - BUSCAR CLIENTES
+# API ENDPOINTS
 
 
 @app.route('/api/buscar_clientes')
 def api_buscar_clientes():
     """API para buscar clientes (autocomplete)"""
-    query = request.args.get('q', '')
-    clientes = buscar_clientes(query)
-    return jsonify(clientes)
+    query = request.args.get('q', '').strip()
 
-# API ENDPOINT - SUBMIT PEDIDO
+    if len(query) < 1:
+        return jsonify([])
+
+    clientes = buscar_clientes_por_texto(query)
+    return jsonify(clientes)
 
 
 @app.route('/submit_pedido', methods=['POST'])
 def submit_pedido():
-    """Processar envio de pedido"""
+    """Endpoint para salvar pedido"""
     try:
         dados = request.get_json()
 
-        # Validar dados recebidos
         if not dados:
-            return jsonify({'success': False, 'message': 'Dados não recebidos'})
-
-        # Salvar no banco
-        numero_pedido = salvar_pedido(dados)
-
-        if numero_pedido:
-            return jsonify({
-                'success': True,
-                'message': f'Pedido criado com sucesso!',
-                'numero_pedido': numero_pedido,
-                'valor_total': f"R$ {dados['valorTotal']:.2f}".replace('.', ',')
-            })
-        else:
             return jsonify({
                 'success': False,
-                'message': 'Erro ao salvar pedido no banco de dados'
+                'message': 'Dados não recebidos'
             })
 
+        print(f"📝 Recebendo pedido de {dados.get('nomeRepresentante', 'N/A')}")
+        print(f"👥 Cliente: {dados.get('razaoSocial', 'N/A')}")
+        print(f"💰 Valor total: R$ {dados.get('valorTotal', 0)}")
+
+        resultado = salvar_pedido(dados)
+        return jsonify(resultado)
+
     except Exception as e:
-        print(f"Erro ao processar pedido: {e}")
+        print(f"❌ Erro no endpoint submit_pedido: {e}")
         return jsonify({
             'success': False,
             'message': f'Erro interno: {str(e)}'
@@ -1862,154 +1260,233 @@ def health():
 
 @app.route('/clientes')
 def listar_clientes():
-    """Listar clientes em JSON"""
-    clientes = buscar_clientes()
-    return jsonify({
-        'clientes': clientes,
-        'total': len(clientes)
-    })
+    """Listar todos os clientes"""
+    conn = conectar_postgresql()
+    if not conn:
+        return jsonify({'erro': 'Erro de conexão'})
 
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT cnpj, razao_social, nome_fantasia, telefone FROM clientes ORDER BY razao_social")
+        clientes = cursor.fetchall()
+        cursor.close()
+        conn.close()
 
-@app.route('/precos')
-def listar_precos():
-    """Listar preços em JSON"""
-    precos = buscar_precos_normal()
-    precos_json = []
+        clientes_json = []
+        for cliente in clientes:
+            clientes_json.append({
+                'cnpj': cliente[0],
+                'razao_social': cliente[1],
+                'nome_fantasia': cliente[2],
+                'telefone': cliente[3]
+            })
 
-    for preco in precos:
-        precos_json.append({
-            'artigo': preco[0],
-            'codigo': preco[1],
-            'descricao': preco[2],
-            'icms_18': float(preco[3]) if preco[3] else 0,
-            'icms_12': float(preco[4]) if preco[4] else 0,
-            'icms_7': float(preco[5]) if preco[5] else 0,
-            'ret_mg': float(preco[6]) if preco[6] else 0
+        return jsonify({
+            'clientes': clientes_json,
+            'total': len(clientes_json)
         })
-
-    return jsonify({
-        'precos': precos_json,
-        'total': len(precos_json)
-    })
+    except Exception as e:
+        return jsonify({'erro': f'Erro ao buscar clientes: {e}'})
 
 
-@app.route('/pedidos', methods=['GET', 'POST'])
-def gerenciar_pedidos():
-    """Gerenciar pedidos - listar ou criar"""
+@app.route('/pedidos')
+def listar_pedidos():
+    """Listar pedidos para Power BI"""
+    conn = conectar_postgresql()
+    if not conn:
+        return jsonify({'erro': 'Erro de conexão'})
 
-    if request.method == 'GET':
-        # Listar pedidos
-        pedidos = buscar_pedidos()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 
+                numero_pedido, cnpj_cliente, razao_social_cliente, 
+                representante, valor_total, created_at,
+                tipo_pedido, tipo_produto, tabela_precos, status
+            FROM pedidos 
+            ORDER BY created_at DESC
+            LIMIT 100
+        """)
+        pedidos = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
         pedidos_json = []
-
         for pedido in pedidos:
             pedidos_json.append({
                 'numero_pedido': pedido[0],
                 'cnpj_cliente': pedido[1],
-                'razao_social': pedido[2] or 'Cliente não encontrado',
+                'razao_social_cliente': pedido[2],
                 'representante': pedido[3],
                 'valor_total': float(pedido[4]) if pedido[4] else 0,
-                'data_criacao': pedido[5].isoformat() if pedido[5] else None
+                'data_criacao': pedido[5].isoformat() if pedido[5] else None,
+                'tipo_pedido': pedido[6],
+                'tipo_produto': pedido[7],
+                'tabela_precos': pedido[8],
+                'status': pedido[9]
             })
 
         return jsonify({
             'pedidos': pedidos_json,
             'total': len(pedidos_json)
         })
+    except Exception as e:
+        return jsonify({'erro': f'Erro ao buscar pedidos: {e}'})
 
-    elif request.method == 'POST':
-        # Criar novo pedido
-        try:
-            dados = request.get_json()
 
-            if not dados:
-                return jsonify({'error': 'Dados não fornecidos'}), 400
+def obter_proximo_numero_pedido():
+    """Obter próximo número de pedido"""
+    conn = conectar_postgresql()
+    if not conn:
+        return None
 
-            # Validações básicas
-            campos_obrigatorios = ['cnpj_cliente', 'representante']
-            for campo in campos_obrigatorios:
-                if campo not in dados or not dados[campo]:
-                    return jsonify({'error': f'Campo obrigatório: {campo}'}), 400
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE sequencia_pedidos SET ultimo_numero = ultimo_numero + 1 WHERE id = 1 RETURNING ultimo_numero")
+        numero = cursor.fetchone()[0]
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return str(numero).zfill(4)  # Formatar com zeros à esquerda
+    except Exception as e:
+        print(f"Erro ao obter número do pedido: {e}")
+        if conn:
+            conn.rollback()
+            conn.close()
+        return None
 
-            # Salvar pedido
-            resultado = salvar_pedido(dados)
 
-            if resultado['success']:
-                return jsonify(resultado['pedido']), 201
-            else:
-                return jsonify({'error': resultado['error']}), 500
+@app.route('/pedidos', methods=['POST'])
+def criar_pedido():
+    """Criar novo pedido"""
+    try:
+        data = request.get_json()
 
-        except Exception as e:
-            return jsonify({'error': f'Erro ao processar pedido: {str(e)}'}), 500
+        # Validar dados obrigatórios
+        if not data.get('cnpj_cliente'):
+            return jsonify({'erro': 'CNPJ do cliente é obrigatório'}), 400
+
+        # Obter próximo número
+        numero_pedido = obter_proximo_numero_pedido()
+        if not numero_pedido:
+            return jsonify({'erro': 'Erro ao gerar número do pedido'}), 500
+
+        # Buscar dados do cliente
+        conn = conectar_postgresql()
+        if not conn:
+            return jsonify({'erro': 'Erro de conexão com banco'}), 500
+
+        cursor = conn.cursor()
+
+        # Buscar cliente
+        cursor.execute("""
+            SELECT razao_social, nome_fantasia 
+            FROM clientes 
+            WHERE cnpj = %s
+        """, (data['cnpj_cliente'],))
+
+        cliente = cursor.fetchone()
+        if not cliente:
+            cursor.close()
+            conn.close()
+            return jsonify({'erro': 'Cliente não encontrado'}), 404
+
+        razao_social, nome_fantasia = cliente
+
+        # Inserir pedido
+        cursor.execute("""
+            INSERT INTO pedidos 
+            (numero_pedido, cnpj_cliente, razao_social_cliente, nome_fantasia_cliente, 
+             representante, observacoes, itens_json, valor_total) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            numero_pedido,
+            data['cnpj_cliente'],
+            razao_social,
+            nome_fantasia,
+            data.get('representante', ''),
+            data.get('observacoes', ''),
+            str(data.get('itens', [])),  # Converter para JSON string
+            float(data.get('valor_total', 0))
+        ))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            'sucesso': True,
+            'numero_pedido': numero_pedido,
+            'mensagem': f'Pedido {numero_pedido} criado com sucesso!'
+        })
+
+    except Exception as e:
+        print(f"Erro ao criar pedido: {e}")
+        if 'conn' in locals() and conn:
+            conn.rollback()
+            conn.close()
+        return jsonify({'erro': f'Erro ao criar pedido: {str(e)}'}), 500
 
 
 @app.route('/pedidos/<numero_pedido>')
 def obter_pedido(numero_pedido):
     """Obter pedido específico"""
-    pedido = buscar_pedido_por_numero(numero_pedido)
+    try:
+        conn = conectar_postgresql()
+        if not conn:
+            return jsonify({'erro': 'Erro de conexão com banco'}), 500
 
-    if not pedido:
-        return jsonify({'error': 'Pedido não encontrado'}), 404
+        cursor = conn.cursor()
 
-    pedido_json = {
-        'id': pedido[0],
-        'numero_pedido': pedido[1],
-        'cnpj_cliente': pedido[2],
-        'representante': pedido[3],
-        'observacoes': pedido[4],
-        'valor_total': float(pedido[5]) if pedido[5] else 0,
-        'created_at': pedido[6].isoformat() if pedido[6] else None,
-        'razao_social': pedido[7],
-        'nome_fantasia': pedido[8]
-    }
+        cursor.execute("""
+            SELECT 
+                id, numero_pedido, cnpj_cliente, razao_social_cliente,
+                nome_fantasia_cliente, representante, observacoes, 
+                itens_json, valor_total, created_at
+            FROM pedidos 
+            WHERE numero_pedido = %s
+        """, (numero_pedido,))
 
-    return jsonify(pedido_json)
+        pedido = cursor.fetchone()
+        cursor.close()
+        conn.close()
 
+        if not pedido:
+            return jsonify({'erro': 'Pedido não encontrado'}), 404
 
-@app.route('/teste-pedido')
-def teste_criar_pedido():
-    """Endpoint para testar criação de pedido"""
-
-    dados_teste = {
-        'cnpj_cliente': '12.345.678/0001-90',
-        'representante': 'REPRESENTANTE TESTE',
-        'observacoes': 'Pedido criado via teste do sistema',
-        'valor_total': 2500.75
-    }
-
-    resultado = salvar_pedido(dados_teste)
-
-    if resultado['success']:
         return jsonify({
-            'message': 'Pedido de teste criado com sucesso!',
-            'pedido': resultado['pedido']
+            'id': pedido[0],
+            'numero_pedido': pedido[1],
+            'cnpj_cliente': pedido[2],
+            'razao_social_cliente': pedido[3],
+            'nome_fantasia_cliente': pedido[4],
+            'representante': pedido[5],
+            'observacoes': pedido[6],
+            'itens': pedido[7],  # JSON string dos itens
+            'valor_total': float(pedido[8]) if pedido[8] else 0,
+            'created_at': pedido[9].isoformat() if pedido[9] else None
         })
-    else:
-        return jsonify({
-            'error': 'Erro ao criar pedido de teste',
-            'details': resultado['error']
-        }), 500
+
+    except Exception as e:
+        print(f"Erro ao buscar pedido: {e}")
+        if 'conn' in locals() and conn:
+            conn.close()
+        return jsonify({'erro': f'Erro ao buscar pedido: {str(e)}'}), 500
 
 
 if __name__ == '__main__':
-    # Configuração para Railway deploy
-    port = int(os.environ.get('PORT', 5001))
-
-    # Inicializar banco de dados
     if init_database():
-        print("🚀 Iniciando DESIGNTEX TECIDOS - Railway Deploy")
-        print("🚀 Iniciando DESIGNTEX TECIDOS - PostgreSQL Web")
-        print(f"📡 Servidor rodando na porta: {port}")
-        print("🔗 Endpoints disponíveis:")
-        print("📝 Novo pedido: http://127.0.0.1:5001/novo-pedido")
+        print("🚀 Iniciando DESIGNTEX TECIDOS - Sistema Completo de Pedidos")
+        print("📡 Servidor rodando em: http://127.0.0.1:5001")
+        print("📋 Formulário de Pedidos: http://127.0.0.1:5001")
         print("🔗 Health check: http://127.0.0.1:5001/health")
-        print("👥 Clientes: http://127.0.0.1:5001/clientes")
-        print("💰 Preços: http://127.0.0.1:5001/precos")
-        print("-" * 50)
+        print("👥 API Clientes: http://127.0.0.1:5001/clientes")
+        print("📦 API Pedidos: http://127.0.0.1:5001/pedidos")
+        print("-" * 60)
 
-      # Railway usa PORT environment variable
-        app.run(host='0.0.0.0', port=port, debug=False)
+        app.run(host='0.0.0.0', port=5001, debug=True)
     else:
         print("❌ Falha na inicialização do banco de dados")
         print("🔧 Verifique as configurações do PostgreSQL")
-        sys.exit(1)
