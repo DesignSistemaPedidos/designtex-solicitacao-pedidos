@@ -1990,6 +1990,36 @@ def teste_criar_pedido():
             'details': resultado['error']
         }), 500
 
+# CONFIGURAÇÃO PARA PRODUÇÃO RAILWAY
+
+
+def get_port():
+    """Obter porta do ambiente (Railway usa PORT)"""
+    return int(os.getenv('PORT', 5001))
+
+
+def is_production():
+    """Verificar se está em produção"""
+    return os.getenv('RAILWAY_ENVIRONMENT') or os.getenv('ENVIRONMENT') == 'production'
+
+
+if __name__ == '__main__':
+    # Inicializar banco de dados
+    if init_database():
+        port = get_port()
+        debug_mode = not is_production()
+
+        print("🚀 Iniciando DESIGNTEX TECIDOS - PostgreSQL Web")
+        print(f"📡 Servidor rodando na porta: {port}")
+        print(f"🔧 Debug mode: {'ON' if debug_mode else 'OFF'}")
+        print(
+            f"🌐 Ambiente: {'PRODUÇÃO' if is_production() else 'DESENVOLVIMENTO'}")
+        print("-" * 50)
+
+        app.run(host='0.0.0.0', port=port, debug=debug_mode)
+    else:
+        print("❌ Falha na inicialização do banco de dados")
+        print("🔧 Verifique as configurações do PostgreSQL")
 
 if __name__ == '__main__':
     # Configuração para Railway deploy

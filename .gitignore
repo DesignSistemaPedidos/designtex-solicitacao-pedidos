@@ -1,20 +1,19 @@
-# Arquivos de ambiente (NUNCA fazer commit)
+# Ambientes virtuais
+venv/
+env/
 .env
-.env.local
-.env.production
-.env.development
 
-# Python
+# Cache Python
 __pycache__/
 *.pyc
 *.pyo
-*.pyd
-.Python
-env/
-venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
 
 # IDEs
 .vscode/
@@ -22,27 +21,10 @@ pip-delete-this-directory.txt
 *.swp
 *.swo
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
-
-# Temporary files
-*.tmp
-*.temp
-
 # Database
 *.db
-*.sqlite
 *.sqlite3
 
-# Reports
-*.pdf
-reports/
-
-# Flask
-instance/
-.webassets-cache
+# Temporários
+temp/
+tmp/
