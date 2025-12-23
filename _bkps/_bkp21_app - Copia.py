@@ -2022,20 +2022,24 @@ if __name__ == '__main__':
         print("🔧 Verifique as configurações do PostgreSQL")
 
 if __name__ == '__main__':
+    # Configuração para Railway deploy
+    port = int(os.environ.get('PORT', 5001))
+
     # Inicializar banco de dados
     if init_database():
-        # Porta para Railway (Railway define PORT automaticamente)
-        port = int(os.environ.get('PORT', 5001))
-
+        print("🚀 Iniciando DESIGNTEX TECIDOS - Railway Deploy")
         print("🚀 Iniciando DESIGNTEX TECIDOS - PostgreSQL Web")
-        print(f"📡 Servidor rodando em: http://127.0.0.1:{port}")
-        print(f"🔗 Health check: http://127.0.0.1:{port}/health")
-        print(f"👥 Clientes: http://127.0.0.1:{port}/clientes")
-        print(f"💰 Preços: http://127.0.0.1:{port}/precos")
+        print(f"📡 Servidor rodando na porta: {port}")
+        print("🔗 Endpoints disponíveis:")
         print("📝 Novo pedido: http://127.0.0.1:5001/novo-pedido")
+        print("🔗 Health check: http://127.0.0.1:5001/health")
+        print("👥 Clientes: http://127.0.0.1:5001/clientes")
+        print("💰 Preços: http://127.0.0.1:5001/precos")
         print("-" * 50)
 
+      # Railway usa PORT environment variable
         app.run(host='0.0.0.0', port=port, debug=False)
     else:
         print("❌ Falha na inicialização do banco de dados")
         print("🔧 Verifique as configurações do PostgreSQL")
+        sys.exit(1)
