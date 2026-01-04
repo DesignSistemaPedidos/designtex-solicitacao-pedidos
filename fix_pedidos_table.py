@@ -1,108 +1,91 @@
 import psycopg2
 import os
 
-def verificar_e_corrigir_tabela_pedidos():
-    """Verificar e corrigir estrutura da tabela pedidos"""
+def corrigir_tabela_pedidos():
+    """Corrigir estrutura da tabela pedidos"""
     
-    # Usar Railway
+    # URL do Railway
     database_url = "postgresql://postgres:zGgADknoSZLTjavfpImTgTBAVSicvJNY@metro.proxy.rlwy.net:47441/railway"
     
     try:
-        print("🔍 VERIFICANDO ESTRUTURA DA TABELA PEDIDOS")
+        print("🔧 CORRIGINDO ESTRUTURA DA TABELA PEDIDOS")
         print("-" * 50)
         
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
-        # Verificar colunas existentes
+        # Verificar estrutura atual
+        print("📋 Verificando colunas atuais...")
         cursor.execute("""
-            SELECT column_name, data_type 
+            SELECT column_name, data_type, character_maximum_length 
             FROM information_schema.columns 
-            WHERE table_name = 'pedidos' 
-            AND table_schema = 'public'
+            WHERE table_name = 'pedidos' AND table_schema = 'public'
             ORDER BY ordinal_position
         """)
-        colunas_existentes = cursor.fetchall()
+        colunas_atuais = cursor.fetchall()
         
-        print("📋 COLUNAS EXISTENTES NA TABELA PEDIDOS:")
-        for coluna in colunas_existentes:
-            print(f"   ✅ {coluna[0]} ({coluna[1]})")
+        print("📝 Colunas existentes:")
+        for coluna in colunas_atuais:
+            print(f"   - {coluna[0]} ({coluna[1]})")
         
-        # Verificar se falta alguma coluna
-        colunas_necessarias = [
-            'razao_social_cliente',
-            'nome_fantasia_cliente', 
-            'representante',
-            'observacoes',
-            'itens_json',
-            'valor_total'
+        # Adicionar colunas que faltam
+        colunas_para_adicionar = [
+            ('tipo_pedido', 'VARCHAR(50)'),
+            ('numero_op', 'VARCHAR(20)'),
+            ('tabela_preco', 'VARCHAR(20)'),
+            ('icms', 'VARCHAR(10)'),
+            ('prazo_entrega', 'VARCHAR(100)'),
+            ('condicoes_pagamento', 'VARCHAR(200)'),
+            ('itens_json', 'TEXT')
         ]
         
-        colunas_faltando = []
-        colunas_atuais = [col[0] for col in colunas_existentes]
+        print("\n🔄 Adicionando colunas faltantes...")
         
-        for coluna in colunas_necessarias:
-            if coluna not in colunas_atuais:
-                colunas_faltando.append(coluna)
-        
-        if colunas_faltando:
-            print(f"\n❌ COLUNAS FALTANDO: {colunas_faltando}")
-            print("🔧 ADICIONANDO COLUNAS...")
-            
-            # Adicionar colunas faltando
-            alter_commands = []
-            
-            if 'razao_social_cliente' in colunas_faltando:
-                alter_commands.append("ADD COLUMN razao_social_cliente VARCHAR(200)")
-            if 'nome_fantasia_cliente' in colunas_faltando:
-                alter_commands.append("ADD COLUMN nome_fantasia_cliente VARCHAR(150)")
-            if 'representante' not in colunas_atuais:
-                alter_commands.append("ADD COLUMN representante VARCHAR(100)")
-            if 'observacoes' not in colunas_atuais:
-                alter_commands.append("ADD COLUMN observacoes TEXT")
-            if 'itens_json' in colunas_faltando:
-                alter_commands.append("ADD COLUMN itens_json TEXT")
-            if 'valor_total' not in colunas_atuais:
-                alter_commands.append("ADD COLUMN valor_total DECIMAL(10,2)")
-            
-            # Executar ALTER TABLE
-            for command in alter_commands:
-                sql = f"ALTER TABLE pedidos {command}"
-                print(f"   🔧 Executando: {sql}")
-                cursor.execute(sql)
-            
-            conn.commit()
-            print("✅ Colunas adicionadas com sucesso!")
-            
-        else:
-            print("✅ Todas as colunas necessárias já existem!")
+        for coluna_nome, coluna_tipo in colunas_para_adicionar:
+            try:
+                # Verificar se coluna já existe
+                cursor.execute("""
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name = 'pedidos' AND column_name = %s
+                """, (coluna_nome,))
+                
+                if cursor.fetchone():
+                    print(f"   ✅ {coluna_nome} já existe")
+                else:
+                    # Adicionar coluna
+                    cursor.execute(f"""
+                        ALTER TABLE pedidos 
+                        ADD COLUMN {coluna_nome} {coluna_tipo}
+                    """)
+                    print(f"   ➕ Adicionada: {coluna_nome} ({coluna_tipo})")
+                    
+            except Exception as e:
+                print(f"   ⚠️  Erro ao adicionar {coluna_nome}: {e}")
         
         # Verificar estrutura final
+        print("\n📋 Estrutura final da tabela pedidos:")
         cursor.execute("""
-            SELECT column_name, data_type 
+            SELECT column_name, data_type, character_maximum_length 
             FROM information_schema.columns 
-            WHERE table_name = 'pedidos' 
-            AND table_schema = 'public'
+            WHERE table_name = 'pedidos' AND table_schema = 'public'
             ORDER BY ordinal_position
         """)
         colunas_finais = cursor.fetchall()
         
-        print("\n📋 ESTRUTURA FINAL DA TABELA PEDIDOS:")
         for coluna in colunas_finais:
-            print(f"   ✅ {coluna[0]} ({coluna[1]})")
+            tipo = coluna[1]
+            if coluna[2]:  # Se tem tamanho máximo
+                tipo += f"({coluna[2]})"
+            print(f"   ✅ {coluna[0]} - {tipo}")
         
+        conn.commit()
         cursor.close()
         conn.close()
         
-        print("\n🎉 TABELA PEDIDOS CORRIGIDA!")
-        return True
+        print("\n🎉 TABELA PEDIDOS CORRIGIDA COM SUCESSO!")
         
     except Exception as e:
-        print(f"❌ Erro: {e}")
-        if 'conn' in locals():
-            conn.rollback()
-            conn.close()
-        return False
+        print(f"❌ Erro ao corrigir tabela: {e}")
 
 if __name__ == '__main__':
-    verificar_e_corrigir_tabela_pedidos()
+    corrigir_tabela_pedidos()

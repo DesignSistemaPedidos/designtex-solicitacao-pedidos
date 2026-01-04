@@ -1,20 +1,21 @@
 import os
 import psycopg2
 
+
 def atualizar_estrutura_banco():
     """Atualizar estrutura do banco para incluir todos os campos"""
-    
-    database_url = "postgresql://postgres:zGgADknoSZLTjavfpImTgTBAVSicvJNY@metro.proxy.rlwy.net:47441/railway"
-    
+
+    database_url = "postgresql://postgres:JKOUPjecfpgkdvSOGUepsTvyloqygzFw@centerbeam.proxy.rlwy.net:15242/railway"
+
     try:
         print("🔄 Conectando ao Railway PostgreSQL...")
         conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
-        
+
         # DELETAR tabela pedidos existente para recriar completa
         print("🗑️ Removendo tabela pedidos antiga...")
         cursor.execute("DROP TABLE IF EXISTS pedidos CASCADE")
-        
+
         # CRIAR tabela pedidos COMPLETA
         print("📋 Criando tabela pedidos completa...")
         cursor.execute("""
@@ -54,7 +55,7 @@ def atualizar_estrutura_banco():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
         # CRIAR tabela pedidos_itens COMPLETA
         print("📋 Criando tabela pedidos_itens...")
         cursor.execute("""
@@ -76,18 +77,22 @@ def atualizar_estrutura_banco():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        
+
         # CRIAR índices para performance
         print("📋 Criando índices...")
-        cursor.execute("CREATE INDEX idx_pedidos_numero ON pedidos(numero_pedido)")
-        cursor.execute("CREATE INDEX idx_pedidos_cnpj ON pedidos(cnpj_cliente)")
-        cursor.execute("CREATE INDEX idx_pedidos_representante ON pedidos(nome_representante)")
+        cursor.execute(
+            "CREATE INDEX idx_pedidos_numero ON pedidos(numero_pedido)")
+        cursor.execute(
+            "CREATE INDEX idx_pedidos_cnpj ON pedidos(cnpj_cliente)")
+        cursor.execute(
+            "CREATE INDEX idx_pedidos_representante ON pedidos(nome_representante)")
         cursor.execute("CREATE INDEX idx_pedidos_data ON pedidos(created_at)")
-        cursor.execute("CREATE INDEX idx_itens_pedido ON pedidos_itens(numero_pedido)")
-        
+        cursor.execute(
+            "CREATE INDEX idx_itens_pedido ON pedidos_itens(numero_pedido)")
+
         conn.commit()
         print("✅ Estrutura do banco atualizada com sucesso!")
-        
+
         # Verificar tabelas criadas
         cursor.execute("""
             SELECT table_name, column_name, data_type 
@@ -95,9 +100,9 @@ def atualizar_estrutura_banco():
             WHERE table_name IN ('pedidos', 'pedidos_itens')
             ORDER BY table_name, ordinal_position
         """)
-        
+
         colunas = cursor.fetchall()
-        
+
         print("\n📋 COLUNAS CRIADAS:")
         tabela_atual = ""
         for coluna in colunas:
@@ -105,18 +110,19 @@ def atualizar_estrutura_banco():
                 tabela_atual = coluna[0]
                 print(f"\n🔹 Tabela: {tabela_atual}")
             print(f"   ✅ {coluna[1]} ({coluna[2]})")
-        
+
         cursor.close()
         conn.close()
-        
+
         return True
-        
+
     except Exception as e:
         print(f"❌ Erro ao atualizar banco: {e}")
         if conn:
             conn.rollback()
             conn.close()
         return False
+
 
 if __name__ == '__main__':
     atualizar_estrutura_banco()

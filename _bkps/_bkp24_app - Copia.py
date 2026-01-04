@@ -1,0 +1,672 @@
+from urllib.parse import urlparse
+import time
+import os
+import sys
+import locale
+import psycopg
+from flask import Flask, render_template_string, request, jsonify, send_file
+from datetime import datetime
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import mm
+import io
+
+# Tentar importar decouple, se não tiver, usar os.getenv
+try:
+    from decouple import config
+    DECOUPLE_AVAILABLE = True
+except ImportError:
+    DECOUPLE_AVAILABLE = False
+    print("⚠️  python-decouple não instalado, usando os.getenv")
+
+
+def get_env(key, default=None):
+    """Função auxiliar para obter variáveis de ambiente"""
+    if DECOUPLE_AVAILABLE:
+        return config(key, default=default)
+    else:
+        return os.getenv(key, default)
+
+# CONFIGURAR ENCODING DO SISTEMA ANTES DE TUDO
+
+
+def configurar_encoding():
+    """Configurar encoding do sistema"""
+    try:
+        # Windows
+        if sys.platform.startswith('win'):
+            os.system('chcp 65001 > nul')
+
+        # Configurar variáveis de ambiente
+        os.environ['PYTHONIOENCODING'] = 'utf-8'
+        os.environ['PGCLIENTENCODING'] = 'SQL_ASCII'  # Mais compatível
+
+        # Configurar locale
+        try:
+            locale.setlocale(locale.LC_ALL, 'C')  # Mais seguro
+        except:
+            pass
+
+        print("✅ Encoding configurado com sucesso")
+
+    except Exception as e:
+        print(f"⚠️  Aviso na configuração de encoding: {e}")
+
+
+# Executar configuração de encoding
+configurar_encoding()
+
+# CONFIGURAÇÃO FLEXÍVEL DE AMBIENTE
+
+
+def get_database_config():
+    """Obter configuração do banco baseada no ambiente"""
+
+    # Verificar DATABASE_URL primeiro (Railway)
+    database_url = os.getenv('DATABASE_URL')
+    environment = os.getenv('ENVIRONMENT', 'development')
+
+    if database_url and (environment == 'production' or 'railway' in database_url):
+        print("🌐 Usando DATABASE_URL do Railway")
+        return {'database_url': database_url}
+
+    elif environment == 'production':
+        print("🚀 Configuração RAILWAY (Produção)")
+        return {
+            'host': os.getenv('RAILWAY_DB_HOST'),
+            'database': os.getenv('RAILWAY_DB_NAME', 'railway'),
+            'user': os.getenv('RAILWAY_DB_USER', 'postgres'),
+            'password': os.getenv('RAILWAY_DB_PASSWORD'),
+            'port': os.getenv('RAILWAY_DB_PORT', '5432'),
+            'client_encoding': 'UTF8',
+            'connect_timeout': 30
+        }
+    else:
+        print("🏠 Configuração LOCAL (Desenvolvimento)")
+        return {
+            'host': os.getenv('LOCAL_DB_HOST', 'localhost'),
+            'database': os.getenv('LOCAL_DB_NAME', 'designtex_db'),
+            'user': os.getenv('LOCAL_DB_USER', 'postgres'),
+            'password': os.getenv('LOCAL_DB_PASSWORD', 'samuca88'),
+            'port': os.getenv('LOCAL_DB_PORT', '5432'),
+            'client_encoding': 'UTF8',
+            'connect_timeout': 30
+        }
+
+
+# Obter configuração do banco
+DATABASE_CONFIG = get_database_config()
+
+
+def conectar_postgresql():
+    """Conectar ao PostgreSQL com retry para Railway"""
+
+    encodings_para_testar = ['UTF8', 'LATIN1', 'WIN1252', 'SQL_ASCII']
+    max_tentativas = 3
+
+    for tentativa in range(max_tentativas):
+        print(f"🔄 Tentativa {tentativa + 1}/{max_tentativas}")
+
+        for encoding in encodings_para_testar:
+            try:
+                print(f"   🔄 Testando encoding: {encoding}")
+
+                # Se tiver DATABASE_URL (Railway)
+                if 'database_url' in DATABASE_CONFIG:
+                    database_url = DATABASE_CONFIG['database_url']
+
+                    # Parse da URL para verificar host
+                    parsed = urlparse(database_url)
+                    print(f"   🌐 Conectando: {parsed.hostname}:{parsed.port}")
+
+                    # Configurações específicas para Railway
+                    conn_params = {
+                        'dsn': database_url,
+                        'connect_timeout': 30,
+                        'application_name': 'designtex_app',
+                        'keepalives_idle': 30,
+                        'keepalives_interval': 10,
+                        'keepalives_count': 3
+                    }
+
+                    conn = psycopg2.connect(**conn_params)
+
+                else:
+                    # Configuração local
+                    config = DATABASE_CONFIG.copy()
+                    config['client_encoding'] = encoding
+                    config['connect_timeout'] = 30
+                    conn = psycopg2.connect(**config)
+
+                # Configurar encoding
+                conn.set_client_encoding(encoding)
+
+                # Testar conexão com timeout
+                cursor = conn.cursor()
+                cursor.execute('SELECT version();')
+                resultado = cursor.fetchone()
+                cursor.close()
+
+                print(f"   ✅ Conectado com {encoding}!")
+                print(f"   📋 {str(resultado[0])[:60]}...")
+
+                return conn
+
+            except psycopg2.OperationalError as e:
+                error_msg = str(e)
+
+                if "server terminated abnormally" in error_msg or "connection failed" in error_msg:
+                    print(
+                        f"   ❌ Conexão Railway instável: {error_msg[:80]}...")
+
+                    # Cleanup
+                    if 'conn' in locals():
+                        try:
+                            conn.close()
+                        except:
+                            pass
+
+                    # Se não é a última tentativa, aguardar
+                    if tentativa < max_tentativas - 1:
+                        wait_time = (tentativa + 1) * 5  # 5s, 10s, 15s
+                        print(
+                            f"   ⏳ Aguardando {wait_time}s para nova tentativa...")
+                        time.sleep(wait_time)
+                    break  # Sair do loop de encodings e tentar novamente
+
+                else:
+                    print(f"   ❌ Erro operacional: {error_msg[:80]}...")
+                    continue
+
+            except Exception as e:
+                print(f"   ❌ Erro geral: {str(e)[:80]}...")
+                if 'conn' in locals():
+                    try:
+                        conn.close()
+                    except:
+                        pass
+                continue
+
+    print("❌ Não foi possível conectar após todas as tentativas")
+    return None
+
+
+def init_database():
+    """Inicializar banco PostgreSQL com encoding seguro"""
+
+    print("🔄 Inicializando PostgreSQL...")
+
+    conn = conectar_postgresql()
+    if not conn:
+        print("❌ Falha na conexão inicial")
+        return False
+
+    try:
+        cursor = conn.cursor()
+
+        # Configurar encoding da sessão (modo compatível)
+        try:
+            cursor.execute("SET client_encoding TO 'SQL_ASCII';")
+            cursor.execute("SET standard_conforming_strings TO on;")
+            print("✅ Encoding da sessão configurado")
+        except:
+            print("⚠️  Usando encoding padrão do servidor")
+
+        # Verificar se as tabelas já existem
+        cursor.execute("""
+            SELECT table_name FROM information_schema.tables 
+            WHERE table_schema = 'public'
+        """)
+        tabelas_existentes = cursor.fetchall()
+
+        if tabelas_existentes:
+            print(
+                f"✅ Banco já inicializado com {len(tabelas_existentes)} tabelas")
+            cursor.close()
+            conn.close()
+            return True
+
+        # Criar tabelas com encoding seguro
+        print("📋 Criando tabelas...")
+
+        # Tabela clientes
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS clientes (
+                id SERIAL PRIMARY KEY,
+                cnpj VARCHAR(18) UNIQUE NOT NULL,
+                razao_social VARCHAR(200) NOT NULL,
+                nome_fantasia VARCHAR(150),
+                telefone VARCHAR(20),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Tabela pedidos
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS pedidos (
+                id SERIAL PRIMARY KEY,
+                numero_pedido VARCHAR(10) UNIQUE NOT NULL,
+                cnpj_cliente VARCHAR(18),
+                representante VARCHAR(100),
+                observacoes TEXT,
+                valor_total DECIMAL(10,2),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Tabela sequencia_pedidos
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sequencia_pedidos (
+                id INTEGER PRIMARY KEY DEFAULT 1,
+                ultimo_numero INTEGER DEFAULT 0
+            )
+        """)
+
+        # Inserir sequência inicial se não existir
+        cursor.execute("""
+            INSERT INTO sequencia_pedidos (id, ultimo_numero) 
+            VALUES (1, 0) 
+            ON CONFLICT (id) DO NOTHING
+        """)
+
+        # Tabelas de preços (estrutura básica)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS precos_normal (
+                id SERIAL PRIMARY KEY,
+                artigo VARCHAR(50),
+                codigo VARCHAR(20),
+                descricao VARCHAR(200),
+                icms_18 DECIMAL(10,2),
+                icms_12 DECIMAL(10,2),
+                icms_7 DECIMAL(10,2),
+                ret_mg DECIMAL(10,2)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS precos_ld (
+                id SERIAL PRIMARY KEY,
+                artigo VARCHAR(50),
+                codigo VARCHAR(20),
+                descricao VARCHAR(200),
+                icms_18_ld DECIMAL(10,2),
+                icms_12_ld DECIMAL(10,2),
+                icms_7_ld DECIMAL(10,2),
+                ret_ld_mg DECIMAL(10,2)
+            )
+        """)
+
+        conn.commit()
+        print("✅ Tabelas PostgreSQL criadas com sucesso!")
+
+        # Inserir dados iniciais
+        inserir_dados_iniciais(cursor, conn)
+
+        cursor.close()
+        conn.close()
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Erro ao inicializar database: {e}")
+        if conn:
+            conn.rollback()
+            conn.close()
+        return False
+
+
+def inserir_dados_iniciais(cursor, conn):
+    """Inserir dados iniciais com encoding seguro"""
+
+    try:
+        print("📋 Inserindo clientes iniciais...")
+
+        # Clientes básicos (sem acentos para evitar problemas de encoding)
+        clientes = [
+            ('12.345.678/0001-90', 'EMPRESA ABC LTDA', 'EMPRESA ABC', '11999990001'),
+            ('98.765.432/0001-10', 'COMERCIAL XYZ SA',
+             'COMERCIAL XYZ', '11999990002'),
+            ('11.222.333/0001-44', 'DISTRIBUIDORA 123 LTDA',
+             'DISTRIBUIDORA 123', '11999990003')
+        ]
+
+        for cnpj, razao, fantasia, telefone in clientes:
+            cursor.execute("""
+                INSERT INTO clientes (cnpj, razao_social, nome_fantasia, telefone) 
+                VALUES (%s, %s, %s, %s) 
+                ON CONFLICT (cnpj) DO NOTHING
+            """, (cnpj, razao, fantasia, telefone))
+
+        conn.commit()
+        print("✅ Clientes iniciais inseridos!")
+
+        # Preços básicos
+        print("📋 Inserindo preços iniciais...")
+
+        precos = [
+            ('ALGODAO 30/1', 'ALG301', 'Tecido algodao 30/1',
+             12.50, 11.80, 11.20, 10.90),
+            ('POLIESTER 150D', 'POL150',
+             'Tecido poliester 150D', 15.30, 14.60, 13.90, 13.50)
+        ]
+
+        for artigo, codigo, desc, p18, p12, p7, ret in precos:
+            cursor.execute("""
+                INSERT INTO precos_normal (artigo, codigo, descricao, icms_18, icms_12, icms_7, ret_mg) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s) 
+                ON CONFLICT DO NOTHING
+            """, (artigo, codigo, desc, p18, p12, p7, ret))
+
+        conn.commit()
+        print("✅ Preços iniciais inseridos!")
+
+    except Exception as e:
+        print(f"⚠️  Erro ao inserir dados iniciais: {e}")
+
+
+def obter_proximo_numero_pedido():
+    """Obter próximo número de pedido"""
+    conn = conectar_postgresql()
+    if not conn:
+        return None
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE sequencia_pedidos SET ultimo_numero = ultimo_numero + 1 WHERE id = 1 RETURNING ultimo_numero")
+        numero = cursor.fetchone()[0]
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return str(numero).zfill(4)  # Formatar com zeros à esquerda
+    except Exception as e:
+        print(f"Erro ao obter número do pedido: {e}")
+        if conn:
+            conn.rollback()
+            conn.close()
+        return None
+
+
+def buscar_clientes():
+    """Buscar todos os clientes"""
+    conn = conectar_postgresql()
+    if not conn:
+        return []
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT cnpj, razao_social, nome_fantasia FROM clientes ORDER BY razao_social")
+        clientes = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return clientes
+    except Exception as e:
+        print(f"Erro ao buscar clientes: {e}")
+        if conn:
+            conn.close()
+        return []
+
+
+def buscar_precos_normal():
+    """Buscar preços normais"""
+    conn = conectar_postgresql()
+    if not conn:
+        return []
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT artigo, codigo, descricao, icms_18, icms_12, icms_7, ret_mg FROM precos_normal ORDER BY artigo")
+        precos = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return precos
+    except Exception as e:
+        print(f"Erro ao buscar preços: {e}")
+        if conn:
+            conn.close()
+        return []
+
+
+# FLASK APP
+app = Flask(__name__)
+
+
+@app.route('/')
+def home():
+    """Página inicial"""
+    environment = get_env('ENVIRONMENT', 'development')
+    is_railway = get_env('RAILWAY_ENVIRONMENT') or get_env('PORT')
+
+    status_ambiente = "🌐 Railway (Produção)" if (
+        environment == 'production' or is_railway) else "🏠 Local (Desenvolvimento)"
+
+    return render_template_string('''
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DESIGNTEX TECIDOS - PostgreSQL</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        .status {
+            background: #e8f5e8;
+            color: #2d5f2d;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .environment {
+            background: #f0f8ff;
+            color: #1e4d72;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .btn {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            margin: 10px;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+        .btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+        .info {
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: left;
+        }
+        .info h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .endpoints {
+            list-style: none;
+            padding: 0;
+        }
+        .endpoints li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .endpoints li:last-child {
+            border-bottom: none;
+        }
+        .endpoints code {
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏭 DESIGNTEX TECIDOS</h1>
+        <p class="subtitle">Sistema de Pedidos - PostgreSQL</p>
+        
+        <div class="environment">
+            {{ status_ambiente }}
+        </div>
+        
+        <div class="status">
+            ✅ PostgreSQL Conectado e Funcionando
+        </div>
+        
+        <a href="/health" class="btn">🔍 Health Check</a>
+        <a href="/clientes" class="btn">👥 Ver Clientes</a>
+        <a href="/precos" class="btn">💰 Ver Preços</a>
+        
+        <div class="info">
+            <h3>📋 Endpoints Disponíveis:</h3>
+            <ul class="endpoints">
+                <li><code>GET /health</code> - Status do sistema</li>
+                <li><code>GET /clientes</code> - Lista de clientes</li>
+                <li><code>GET /precos</code> - Tabela de preços</li>
+                <li><code>POST /pedidos</code> - Criar pedido</li>
+                <li><code>GET /gerar-pdf/{numero}</code> - PDF do pedido</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
+    ''', status_ambiente=status_ambiente)
+
+
+@app.route('/health')
+def health():
+    """Health check endpoint"""
+    conn = conectar_postgresql()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT version();')
+            version = cursor.fetchone()[0]
+
+            # Informações do ambiente
+            environment = get_env('ENVIRONMENT', 'development')
+            is_railway = get_env('RAILWAY_ENVIRONMENT') or get_env('PORT')
+
+            cursor.close()
+            conn.close()
+
+            return jsonify({
+                'status': 'OK',
+                'database': 'PostgreSQL - Conectado',
+                'version': version[:50],
+                'environment': 'production' if (environment == 'production' or is_railway) else 'development',
+                'timestamp': datetime.now().isoformat()
+            })
+        except Exception as e:
+            return jsonify({
+                'status': 'ERROR',
+                'database': f'Erro: {str(e)}',
+                'timestamp': datetime.now().isoformat()
+            }), 500
+    else:
+        return jsonify({
+            'status': 'ERROR',
+            'database': 'PostgreSQL - Desconectado',
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+
+@app.route('/clientes')
+def listar_clientes():
+    """Listar clientes em JSON"""
+    clientes = buscar_clientes()
+    clientes_json = []
+
+    for cliente in clientes:
+        clientes_json.append({
+            'cnpj': cliente[0],
+            'razao_social': cliente[1],
+            'nome_fantasia': cliente[2]
+        })
+
+    return jsonify({
+        'clientes': clientes_json,
+        'total': len(clientes_json)
+    })
+
+
+@app.route('/precos')
+def listar_precos():
+    """Listar preços em JSON"""
+    precos = buscar_precos_normal()
+    precos_json = []
+
+    for preco in precos:
+        precos_json.append({
+            'artigo': preco[0],
+            'codigo': preco[1],
+            'descricao': preco[2],
+            'icms_18': float(preco[3]) if preco[3] else 0,
+            'icms_12': float(preco[4]) if preco[4] else 0,
+            'icms_7': float(preco[5]) if preco[5] else 0,
+            'ret_mg': float(preco[6]) if preco[6] else 0
+        })
+
+    return jsonify({
+        'precos': precos_json,
+        'total': len(precos_json)
+    })
+
+
+if __name__ == '__main__':
+    # Inicializar banco de dados
+    if init_database():
+        port = int(get_env('PORT', 5001))
+        debug = get_env('FLASK_DEBUG', 'true').lower() == 'true'
+
+        print("🚀 Iniciando DESIGNTEX TECIDOS - PostgreSQL Web")
+        print(f"📡 Servidor rodando na porta: {port}")
+        print(f"🔗 Health check: http://127.0.0.1:{port}/health")
+        print(f"👥 Clientes: http://127.0.0.1:{port}/clientes")
+        print(f"💰 Preços: http://127.0.0.1:{port}/precos")
+        print("-" * 50)
+
+        app.run(host='0.0.0.0', port=port, debug=debug)
+    else:
+        print("❌ Falha na inicialização do banco de dados")
+        print("🔧 Verifique as configurações do PostgreSQL")

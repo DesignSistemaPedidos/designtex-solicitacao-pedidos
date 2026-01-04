@@ -6,7 +6,7 @@ from flask import Flask, render_template_string, request, jsonify, send_file, re
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-from reportlab.lib.units import mm, cm
+from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -20,200 +20,7 @@ from email import encoders
 import tempfile
 import json
 
-
-def enviar_email_pedido_completo(dados_pedido, numero_pedido, pdf_buffer):
-    """Enviar email com PDF do pedido para os destinatários corretos"""
-
-    EMAIL_HOST = 'smtp.gmail.com'
-    EMAIL_PORT = 587
-    EMAIL_USER = 'design.designtextecidos@gmail.com'
-    EMAIL_PASS = 'gyeq qadn xmxl tuxp'
-
-    EMAIL_DESTINOS = [
-        'pedido@designtextecidos.com.br',
-        'design2@designtextecidos.com.br'
-    ]
-
-    try:
-        print(f"📧 Preparando email para: {', '.join(EMAIL_DESTINOS)}")
-
-        # Criar mensagem
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_USER
-        msg['To'] = ', '.join(EMAIL_DESTINOS)
-        msg['Subject'] = f"🏭 NOVO PEDIDO DTX #{numero_pedido} - {dados_pedido.get('razaoSocial', '')[:30]}"
-
-        corpo_html = f"""
-        <html>
-        <body>
-            <div><strong>Número:</strong> #{numero_pedido}</div>
-            <div><strong>Representante:</strong> {dados_pedido.get('nomeRepresentante', '')}</div>
-            <div><strong>Cliente:</strong> {dados_pedido.get('razaoSocial', '')}</div>
-            <div><strong>CNPJ:</strong> {dados_pedido.get('cnpj', '')}</div>
-            <div><strong>Valor Total:</strong> R$ {dados_pedido.get('valorTotal', 0):.2f}</div>
-        </body>
-        </html>
-        """
-        msg.attach(MIMEText(corpo_html, 'html'))
-
-        # Anexar PDF
-        if pdf_buffer and pdf_buffer.getvalue():
-            pdf_buffer.seek(0)
-            part = MIMEBase('application', 'pdf')
-            part.set_payload(pdf_buffer.read())
-            encoders.encode_base64(part)
-            nome_arquivo = f"Pedido_DTX_{numero_pedido}_{dados_pedido.get('razaoSocial', '').replace(' ', '_')[:20]}.pdf"
-            part.add_header('Content-Disposition',
-                            f'attachment; filename="{nome_arquivo}"')
-            msg.attach(part)
-            print("✅ PDF anexado ao email")
-        else:
-            print("⚠️ Nenhum PDF para anexar")
-
-        print("📤 Enviando email...")
-        server = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT)
-        server.starttls()
-        server.login(EMAIL_USER, EMAIL_PASS)
-        server.sendmail(EMAIL_USER, EMAIL_DESTINOS, msg.as_string())
-        server.quit()
-        print(f"✅ Email enviado com SUCESSO para: {', '.join(EMAIL_DESTINOS)}")
-        return True
-
-    except Exception as e:
-        print(f"❌ ERRO ao enviar email: {str(e)}")
-        return False
-
 # CONFIGURAR ENCODING DO SISTEMA ANTES DE TUDO
-
-
-def gerar_pdf_pedido(dados_pedido, numero_pedido):
-    """Gerar PDF do pedido"""
-    from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib import colors
-    from reportlab.lib.units import mm, cm
-    import io
-
-    try:
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4,
-                                rightMargin=20*mm, leftMargin=20*mm,
-                                topMargin=20*mm, bottomMargin=20*mm)
-
-        styles = getSampleStyleSheet()
-        title_style = ParagraphStyle('CustomTitle',
-                                     parent=styles['Heading1'],
-                                     fontSize=16,
-                                     spaceAfter=30,
-                                     alignment=1)
-
-        story = []
-        story.append(Paragraph("DESIGNTEX TECIDOS", title_style))
-        story.append(
-            Paragraph(f"PEDIDO DE VENDAS Nº {numero_pedido}", title_style))
-        story.append(Spacer(1, 20))
-
-        # Dados do cliente
-        cliente_data = [
-            ['DADOS DO CLIENTE', ''],
-            ['Representante:', dados_pedido.get('nomeRepresentante', '')],
-            ['Cliente:', dados_pedido.get('razaoSocial', '')],
-            ['CNPJ:', dados_pedido.get('cnpj', '')],
-            ['Telefone:', dados_pedido.get('telefone', '')],
-        ]
-
-        cliente_table = Table(cliente_data, colWidths=[4*cm, 12*cm])
-        cliente_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        story.append(cliente_table)
-        story.append(Spacer(1, 20))
-
-        # Condições do pedido (adapte se precisar)
-        condicoes_data = [
-            ['CONDIÇÕES DO PEDIDO', ''],
-            ['Tipo Pedido:', dados_pedido.get('tipoPedido', '')],
-            ['Número OP:', dados_pedido.get('numeroOP', 'N/A')],
-            ['Tabela Preços:', dados_pedido.get('tabelaPrecos', '')],
-            ['Tipo Produto:', dados_pedido.get('tipoProduto', '')],
-            ['Tipo Frete:', dados_pedido.get('tipoFrete', '')],
-            ['Venda Triangular:', dados_pedido.get('vendaTriangular', '')],
-            ['Regime RET:', dados_pedido.get('regimeRET', '')],
-        ]
-
-        condicoes_table = Table(condicoes_data, colWidths=[4*cm, 12*cm])
-        condicoes_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        story.append(condicoes_table)
-        story.append(Spacer(1, 20))
-
-        # Produtos
-        produtos_data = [['Artigo', 'Código',
-                          'Desenho/Cor', 'Metragem', 'Preço', 'Subtotal']]
-        for produto in dados_pedido.get('produtos', []):
-            produtos_data.append([
-                produto.get('artigo', ''),
-                produto.get('codigo', ''),
-                produto.get('desenho_cor', ''),
-                f"{produto.get('metragem', 0):.2f}",
-                f"R$ {produto.get('preco', 0):.2f}",
-                f"R$ {produto.get('subtotal', 0):.2f}"
-            ])
-        produtos_data.append(
-            ['', '', '', '', 'TOTAL:', f"R$ {dados_pedido.get('valorTotal', 0):.2f}"])
-        produtos_table = Table(produtos_data, colWidths=[
-                               3*cm, 2*cm, 4*cm, 2*cm, 2.5*cm, 2.5*cm])
-        produtos_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-            ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
-            ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        story.append(produtos_table)
-        story.append(Spacer(1, 20))
-
-        # Observações
-        if dados_pedido.get('observacoes'):
-            story.append(Paragraph("OBSERVAÇÕES:", styles['Heading2']))
-            story.append(Paragraph(dados_pedido.get(
-                'observacoes'), styles['Normal']))
-
-        # Rodapé
-        story.append(Spacer(1, 30))
-        story.append(Paragraph(
-            f"Pedido gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
-
-        # Gerar PDF
-        doc.build(story)
-        buffer.seek(0)
-        return buffer
-
-    except Exception as e:
-        print(f"Erro ao gerar PDF: {e}")
-        return None
-
-
 def configurar_encoding():
     """Configurar encoding do sistema"""
     try:
@@ -233,7 +40,6 @@ def configurar_encoding():
     except Exception as e:
         print(f"⚠️  Aviso na configuração de encoding: {e}")
 
-
 # Executar configuração de encoding
 configurar_encoding()
 
@@ -248,7 +54,6 @@ EMAIL_CONFIG = {
     # SUBSTITUIR
     'email_remetente': os.getenv('EMAIL_FROM', 'design.designtextecidos@gmail.com')
 }
-
 
 def enviar_email_pedido_completo(dados_pedido, numero_pedido, pdf_buffer):
     """Enviar email com PDF do pedido para os destinatários corretos"""
@@ -346,8 +151,6 @@ def enviar_email_pedido_completo(dados_pedido, numero_pedido, pdf_buffer):
         return False
 
 # CONFIGURAÇÃO FLEXÍVEL DE BANCO DE DADOS
-
-
 def get_database_config():
     """Obter configuração do banco baseada no ambiente"""
 
@@ -381,10 +184,8 @@ def get_database_config():
             'connect_timeout': 30
         }
 
-
 # Obter configuração do banco
 DATABASE_CONFIG = get_database_config()
-
 
 def conectar_postgresql():
     """Conectar ao PostgreSQL (local ou Railway)"""
@@ -437,7 +238,6 @@ def conectar_postgresql():
     print("❌ Não foi possível conectar com nenhum encoding")
     return None
 
-
 def init_database():
     """Inicializar banco PostgreSQL com encoding seguro"""
 
@@ -467,8 +267,7 @@ def init_database():
         tabelas_existentes = cursor.fetchall()
 
         if tabelas_existentes:
-            print(
-                f"✅ Banco já inicializado com {len(tabelas_existentes)} tabelas")
+            print(f"✅ Banco já inicializado com {len(tabelas_existentes)} tabelas")
             cursor.close()
             conn.close()
             return True
@@ -584,7 +383,6 @@ def init_database():
             conn.close()
         return False
 
-
 def inserir_dados_iniciais(cursor, conn):
     """Inserir dados iniciais com encoding seguro"""
 
@@ -594,12 +392,9 @@ def inserir_dados_iniciais(cursor, conn):
         # Clientes básicos (sem acentos para evitar problemas de encoding)
         clientes = [
             ('12.345.678/0001-90', 'EMPRESA ABC LTDA', 'EMPRESA ABC', '11999990001'),
-            ('98.765.432/0001-10', 'COMERCIAL XYZ SA',
-             'COMERCIAL XYZ', '11999990002'),
-            ('11.222.333/0001-44', 'DISTRIBUIDORA 123 LTDA',
-             'DISTRIBUIDORA 123', '11999990003'),
-            ('22.333.444/0001-55', 'CONFECCOES DELTA LTDA',
-             'CONFECCOES DELTA', '11999990004'),
+            ('98.765.432/0001-10', 'COMERCIAL XYZ SA', 'COMERCIAL XYZ', '11999990002'),
+            ('11.222.333/0001-44', 'DISTRIBUIDORA 123 LTDA', 'DISTRIBUIDORA 123', '11999990003'),
+            ('22.333.444/0001-55', 'CONFECCOES DELTA LTDA', 'CONFECCOES DELTA', '11999990004'),
             ('33.444.555/0001-66', 'TEXTIL OMEGA SA', 'TEXTIL OMEGA', '11999990005')
         ]
 
@@ -617,14 +412,10 @@ def inserir_dados_iniciais(cursor, conn):
         print("📋 Inserindo preços iniciais...")
 
         precos = [
-            ('ALGODAO 30/1', 'ALG301', 'Tecido algodao 30/1 - 1,50m',
-             12.50, 11.80, 11.20, 10.90),
-            ('POLIESTER 150D', 'POL150', 'Tecido poliester 150D - 1,40m',
-             15.30, 14.60, 13.90, 13.50),
-            ('VISCOSE 30/1', 'VIS301', 'Tecido viscose 30/1 - 1,50m',
-             18.90, 17.20, 16.50, 16.00),
-            ('MODAL 40/1', 'MOD401', 'Tecido modal 40/1 - 1,60m',
-             22.80, 21.90, 21.10, 20.50)
+            ('ALGODAO 30/1', 'ALG301', 'Tecido algodao 30/1 - 1,50m', 12.50, 11.80, 11.20, 10.90),
+            ('POLIESTER 150D', 'POL150', 'Tecido poliester 150D - 1,40m', 15.30, 14.60, 13.90, 13.50),
+            ('VISCOSE 30/1', 'VIS301', 'Tecido viscose 30/1 - 1,50m', 18.90, 17.20, 16.50, 16.00),
+            ('MODAL 40/1', 'MOD401', 'Tecido modal 40/1 - 1,60m', 22.80, 21.90, 21.10, 20.50)
         ]
 
         for artigo, codigo, desc, p18, p12, p7, ret in precos:
@@ -639,7 +430,6 @@ def inserir_dados_iniciais(cursor, conn):
 
     except Exception as e:
         print(f"⚠️  Erro ao inserir dados iniciais: {e}")
-
 
 def obter_proximo_numero_pedido():
     """Obter próximo número de pedido"""
@@ -663,7 +453,6 @@ def obter_proximo_numero_pedido():
             conn.close()
         return None
 
-
 def buscar_clientes():
     """Buscar todos os clientes"""
     conn = conectar_postgresql()
@@ -684,7 +473,6 @@ def buscar_clientes():
             conn.close()
         return []
 
-
 def buscar_precos_normal():
     """Buscar preços normais"""
     conn = conectar_postgresql()
@@ -704,7 +492,6 @@ def buscar_precos_normal():
         if conn:
             conn.close()
         return []
-
 
 def salvar_pedido(dados_pedido):
     """Salvar pedido no banco de dados"""
@@ -777,33 +564,31 @@ def salvar_pedido(dados_pedido):
             conn.close()
         return None
 
-
 def gerar_pdf_pedido(dados_pedido, numero_pedido):
     """Gerar PDF do pedido"""
-    from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib import colors
-    from reportlab.lib.units import mm, cm
-    import io
-
     try:
+        # Criar buffer em memória
         buffer = io.BytesIO()
+
+        # Criar documento PDF
         doc = SimpleDocTemplate(buffer, pagesize=A4,
                                 rightMargin=20*mm, leftMargin=20*mm,
                                 topMargin=20*mm, bottomMargin=20*mm)
 
+        # Estilos
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle('CustomTitle',
                                      parent=styles['Heading1'],
                                      fontSize=16,
                                      spaceAfter=30,
-                                     alignment=1)
+                                     alignment=1)  # Centralizado
 
+        # Conteúdo do PDF
         story = []
+
+        # Cabeçalho
         story.append(Paragraph("DESIGNTEX TECIDOS", title_style))
-        story.append(
-            Paragraph(f"PEDIDO DE VENDAS Nº {numero_pedido}", title_style))
+        story.append(Paragraph(f"PEDIDO DE VENDAS Nº {numero_pedido}", title_style))
         story.append(Spacer(1, 20))
 
         # Dados do cliente
@@ -829,7 +614,7 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
         story.append(cliente_table)
         story.append(Spacer(1, 20))
 
-        # Condições do pedido (adapte se precisar)
+        # Condições do pedido
         condicoes_data = [
             ['CONDIÇÕES DO PEDIDO', ''],
             ['Tipo Pedido:', dados_pedido.get('tipoPedido', '')],
@@ -856,8 +641,8 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
         story.append(Spacer(1, 20))
 
         # Produtos
-        produtos_data = [['Artigo', 'Código',
-                          'Desenho/Cor', 'Metragem', 'Preço', 'Subtotal']]
+        produtos_data = [['Artigo', 'Código', 'Desenho/Cor', 'Metragem', 'Preço', 'Subtotal']]
+
         for produto in dados_pedido.get('produtos', []):
             produtos_data.append([
                 produto.get('artigo', ''),
@@ -867,10 +652,12 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
                 f"R$ {produto.get('preco', 0):.2f}",
                 f"R$ {produto.get('subtotal', 0):.2f}"
             ])
+
+        # Total
         produtos_data.append(
             ['', '', '', '', 'TOTAL:', f"R$ {dados_pedido.get('valorTotal', 0):.2f}"])
-        produtos_table = Table(produtos_data, colWidths=[
-                               3*cm, 2*cm, 4*cm, 2*cm, 2.5*cm, 2.5*cm])
+
+        produtos_table = Table(produtos_data, colWidths=[3*cm, 2*cm, 4*cm, 2*cm, 2.5*cm, 2.5*cm])
         produtos_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -888,16 +675,16 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
         # Observações
         if dados_pedido.get('observacoes'):
             story.append(Paragraph("OBSERVAÇÕES:", styles['Heading2']))
-            story.append(Paragraph(dados_pedido.get(
-                'observacoes'), styles['Normal']))
+            story.append(Paragraph(dados_pedido.get('observacoes'), styles['Normal']))
 
         # Rodapé
         story.append(Spacer(1, 30))
-        story.append(Paragraph(
-            f"Pedido gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
+        story.append(Paragraph(f"Pedido gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
 
         # Gerar PDF
         doc.build(story)
+
+        # Retornar buffer
         buffer.seek(0)
         return buffer
 
@@ -905,10 +692,8 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
         print(f"Erro ao gerar PDF: {e}")
         return None
 
-
 # FLASK APP
 app = Flask(__name__)
-
 
 @app.route('/')
 def home():
@@ -1052,7 +837,6 @@ def home():
 </html>
     ''')
 
-
 @app.route('/criar-pedido')
 def criar_pedido():
     """Página para criar novo pedido"""
@@ -1061,7 +845,7 @@ def criar_pedido():
     prazos = [
         "À vista",
         "7 dias",
-        "14 dias",
+        "14 dias", 
         "21 dias",
         "28 dias",
         "30 dias",
@@ -1565,140 +1349,79 @@ def criar_pedido():
             produtoDiv.innerHTML = `
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h6 class="mb-0">Produto ${contadorProdutos}</h6>
-                    <button type="button" class="btn btn-danger btn-sm" onclick="removerProduto(${contadorProdutos})">
+                    <button type="button" class="btn btn-sm btn-danger" onclick="removerProduto(${contadorProdutos})">
                         🗑️ Remover
                     </button>
                 </div>
-                
                 <div class="row">
-                    <div class="col-md-3 mb-2">
+                    <div class="col-md-3 mb-3">
                         <label class="form-label">Artigo *</label>
-                        <select class="form-select artigo-select" data-produto="${contadorProdutos}" required>
-                            <option value="">Selecione...</option>
-                            <option value="ALGODAO 30/1">ALGODAO 30/1</option>
-                            <option value="POLIESTER 150D">POLIESTER 150D</option>
-                            <option value="VISCOSE 30/1">VISCOSE 30/1</option>
-                            <option value="MODAL 40/1">MODAL 40/1</option>
-                        </select>
+                        <input type="text" class="form-control produto-artigo" data-produto="${contadorProdutos}" required>
                     </div>
-                    
-                    <div class="col-md-2 mb-2">
+                    <div class="col-md-3 mb-3">
                         <label class="form-label">Código</label>
-                        <input type="text" class="form-control codigo-input" data-produto="${contadorProdutos}" readonly>
+                        <input type="text" class="form-control produto-codigo" data-produto="${contadorProdutos}">
                     </div>
-                    
-                    <div class="col-md-3 mb-2">
-                        <label class="form-label">Desenho/Cor *</label>
-                        <input type="text" class="form-control desenho-input" data-produto="${contadorProdutos}" required>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Desenho/Cor</label>
+                        <input type="text" class="form-control produto-desenho" data-produto="${contadorProdutos}">
                     </div>
-                    
-                    <div class="col-md-2 mb-2">
+                    <div class="col-md-3 mb-3">
                         <label class="form-label">Metragem *</label>
-                        <input type="number" class="form-control metragem-input" data-produto="${contadorProdutos}" 
-                               min="0.01" step="0.01" required>
+                        <input type="number" step="0.01" class="form-control produto-metragem" data-produto="${contadorProdutos}" required onchange="calcularSubtotal(${contadorProdutos})">
                     </div>
-                    
-                    <div class="col-md-2 mb-2">
-                        <label class="form-label">Preço Unitário</label>
-                        <input type="number" class="form-control preco-input" data-produto="${contadorProdutos}" 
-                               step="0.01" readonly>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Preço Unit. (R$) *</label>
+                        <input type="number" step="0.01" class="form-control produto-preco" data-produto="${contadorProdutos}" required onchange="calcularSubtotal(${contadorProdutos})">
                     </div>
-                </div>
-                
-                <div class="text-end">
-                    <strong>Subtotal: R$ <span class="subtotal" data-produto="${contadorProdutos}">0,00</span></strong>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label">Subtotal (R$)</label>
+                        <input type="number" step="0.01" class="form-control produto-subtotal" data-produto="${contadorProdutos}" readonly style="background-color: #f8f9fa;">
+                    </div>
                 </div>
             `;
             
             container.appendChild(produtoDiv);
-            
-            // Adicionar event listeners
-            adicionarEventListenersProduto(contadorProdutos);
         }
 
         function removerProduto(id) {
-            const produto = document.getElementById(`produto-${id}`);
-            if (produto) {
-                produto.remove();
-                calcularTotal();
-            }
+            document.getElementById(`produto-${id}`).remove();
+            calcularTotal();
         }
 
-        function adicionarEventListenersProduto(id) {
-            // Artigo change
-            const artigoSelect = document.querySelector(`select[data-produto="${id}"]`);
-            artigoSelect.addEventListener('change', function() {
-                atualizarPrecoProduto(id, this.value);
-            });
-            
-            // Metragem change
-            const metragemInput = document.querySelector(`input.metragem-input[data-produto="${id}"]`);
-            metragemInput.addEventListener('input', function() {
-                calcularSubtotal(id);
-            });
-        }
-
-        function atualizarPrecoProduto(produtoId, artigo) {
-            // Mapear preços (você pode buscar do servidor depois)
-            const precos = {
-                'ALGODAO 30/1': { codigo: 'ALG301', preco: 12.50 },
-                'POLIESTER 150D': { codigo: 'POL150', preco: 15.30 },
-                'VISCOSE 30/1': { codigo: 'VIS301', preco: 18.90 },
-                'MODAL 40/1': { codigo: 'MOD401', preco: 22.80 }
-            };
-            
-            const codigoInput = document.querySelector(`input.codigo-input[data-produto="${produtoId}"]`);
-            const precoInput = document.querySelector(`input.preco-input[data-produto="${produtoId}"]`);
-            
-            if (precos[artigo]) {
-                codigoInput.value = precos[artigo].codigo;
-                precoInput.value = precos[artigo].preco.toFixed(2);
-                calcularSubtotal(produtoId);
-            } else {
-                codigoInput.value = '';
-                precoInput.value = '';
-                calcularSubtotal(produtoId);
-            }
-        }
-
-        function calcularSubtotal(produtoId) {
-            const metragem = parseFloat(document.querySelector(`input.metragem-input[data-produto="${produtoId}"]`).value) || 0;
-            const preco = parseFloat(document.querySelector(`input.preco-input[data-produto="${produtoId}"]`).value) || 0;
+        function calcularSubtotal(id) {
+            const metragem = parseFloat(document.querySelector(`[data-produto="${id}"].produto-metragem`).value) || 0;
+            const preco = parseFloat(document.querySelector(`[data-produto="${id}"].produto-preco`).value) || 0;
             const subtotal = metragem * preco;
             
-            document.querySelector(`span.subtotal[data-produto="${produtoId}"]`).textContent = subtotal.toFixed(2);
+            document.querySelector(`[data-produto="${id}"].produto-subtotal`).value = subtotal.toFixed(2);
+            
             calcularTotal();
         }
 
         function calcularTotal() {
             let total = 0;
-            document.querySelectorAll('.subtotal').forEach(span => {
-                total += parseFloat(span.textContent) || 0;
+            
+            document.querySelectorAll('.produto-subtotal').forEach(input => {
+                total += parseFloat(input.value) || 0;
             });
-            document.getElementById('valorTotal').textContent = total.toFixed(2);
+            
+            document.getElementById('valorTotal').textContent = total.toFixed(2).replace('.', ',');
         }
 
-        // Contador de caracteres
-        document.getElementById('observacoes').addEventListener('input', function() {
-            document.getElementById('contadorCaracteres').textContent = this.value.length;
+        // ========== CONTADOR DE CARACTERES ==========
+        document.getElementById('observacoes').addEventListener('input', function () {
+            const contador = document.getElementById('contadorCaracteres');
+            contador.textContent = this.value.length;
         });
 
-        function limparFormulario() {
-            if (confirm('Deseja realmente cancelar e limpar todos os dados?')) {
-                document.getElementById('pedidoForm').reset();
-                document.getElementById('produtos-container').innerHTML = '';
-                contadorProdutos = 0;
-                calcularTotal();
-            }
-        }
-
-        // Submit do formulário
-        document.getElementById('pedidoForm').addEventListener('submit', function(e) {
+        // ========== ENVIO DO FORMULÁRIO ==========
+        document.getElementById('pedidoForm').addEventListener('submit', function (e) {
             e.preventDefault();
             
             // Validar se há produtos
-            if (contadorProdutos === 0) {
-                alert('Adicione pelo menos um produto ao pedido!');
+            if (contadorProdutos === 0 || document.querySelectorAll('.produto-artigo').length === 0) {
+                alert('❌ Adicione pelo menos um produto ao pedido!');
                 return;
             }
             
@@ -1710,66 +1433,101 @@ def criar_pedido():
                 telefone: document.getElementById('telefone').value,
                 prazoPagamento: document.getElementById('prazoPagamento').value,
                 tipoPedido: document.getElementById('tipoPedido').value,
-                numeroOP: document.getElementById('numeroOP').value,
+                numeroOP: document.getElementById('numeroOP').value || '',
                 tipoFrete: document.getElementById('tipoFrete').value,
                 tipoProduto: document.getElementById('tipoProduto').value,
                 vendaTriangular: document.getElementById('vendaTriangular').value,
                 regimeRET: document.getElementById('regimeRET').value,
-                tabelaPrecos: document.querySelector('input[name="tabelaPrecos"]:checked')?.value,
+                tabelaPrecos: document.querySelector('input[name="tabelaPrecos"]:checked')?.value || '',
                 observacoes: document.getElementById('observacoes').value,
                 produtos: [],
-                valorTotal: parseFloat(document.getElementById('valorTotal').textContent)
+                valorTotal: 0
             };
             
             // Coletar produtos
+            let totalGeral = 0;
+            
             document.querySelectorAll('[id^="produto-"]').forEach(produtoDiv => {
-                const produtoId = produtoDiv.id.replace('produto-', '');
+                const id = produtoDiv.id.split('-')[1];
+                
                 const produto = {
-                    artigo: produtoDiv.querySelector(`select[data-produto="${produtoId}"]`).value,
-                    codigo: produtoDiv.querySelector(`input.codigo-input[data-produto="${produtoId}"]`).value,
-                    desenho_cor: produtoDiv.querySelector(`input.desenho-input[data-produto="${produtoId}"]`).value,
-                    metragem: parseFloat(produtoDiv.querySelector(`input.metragem-input[data-produto="${produtoId}"]`).value),
-                    preco: parseFloat(produtoDiv.querySelector(`input.preco-input[data-produto="${produtoId}"]`).value),
-                    subtotal: parseFloat(produtoDiv.querySelector(`span.subtotal[data-produto="${produtoId}"]`).textContent)
+                    artigo: document.querySelector(`[data-produto="${id}"].produto-artigo`).value,
+                    codigo: document.querySelector(`[data-produto="${id}"].produto-codigo`).value,
+                    desenho_cor: document.querySelector(`[data-produto="${id}"].produto-desenho`).value,
+                    metragem: parseFloat(document.querySelector(`[data-produto="${id}"].produto-metragem`).value) || 0,
+                    preco: parseFloat(document.querySelector(`[data-produto="${id}"].produto-preco`).value) || 0,
+                    subtotal: parseFloat(document.querySelector(`[data-produto="${id}"].produto-subtotal`).value) || 0
                 };
+                
                 dadosPedido.produtos.push(produto);
+                totalGeral += produto.subtotal;
             });
             
-            // Enviar pedido
+            dadosPedido.valorTotal = totalGeral;
+            
+            // Enviar dados
+            enviarPedido(dadosPedido);
+        });
+
+        function enviarPedido(dados) {
+            // Mostrar loading
+            const btnSubmit = document.querySelector('button[type="submit"]');
+            const textoOriginal = btnSubmit.innerHTML;
+            btnSubmit.innerHTML = '⏳ Enviando...';
+            btnSubmit.disabled = true;
+            
             fetch('/submit_pedido', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(dadosPedido)
+                body: JSON.stringify(dados)
             })
             .then(response => response.json())
-            .then(data => {
-                if (data.sucesso) {
-                    alert(`Pedido enviado com sucesso! Número: ${data.numero_pedido}`);
+            .then(result => {
+                if (result.success) {
+                    alert(`✅ Pedido enviado com sucesso!\\nNúmero: ${result.numero_pedido}\\n\\nEmail enviado para os destinatários.`);
                     limparFormulario();
                 } else {
-                    alert(`Erro ao enviar pedido: ${data.erro}`);
+                    alert(`❌ Erro ao enviar pedido: ${result.error}`);
                 }
             })
             .catch(error => {
                 console.error('Erro:', error);
-                alert('Erro ao enviar pedido. Tente novamente.');
+                alert('❌ Erro ao enviar pedido. Tente novamente.');
+            })
+            .finally(() => {
+                // Restaurar botão
+                btnSubmit.innerHTML = textoOriginal;
+                btnSubmit.disabled = false;
             });
-        });
+        }
 
-        // Adicionar primeiro produto automaticamente
-        window.addEventListener('load', function() {
+        function limparFormulario() {
+            document.getElementById('pedidoForm').reset();
+            document.getElementById('produtos-container').innerHTML = '';
+            document.getElementById('valorTotal').textContent = '0,00';
+            document.getElementById('contadorCaracteres').textContent = '0';
+            contadorProdutos = 0;
+            
+            // Ocultar campos condicionais
+            document.getElementById('campoNumeroOP').style.display = 'none';
+            document.getElementById('campoTransportadoraFOB').style.display = 'none';
+            document.getElementById('campoTransportadoraCIF').style.display = 'none';
+            document.getElementById('campoTriangulacao').style.display = 'none';
+        }
+
+        // Adicionar um produto por padrão ao carregar
+        window.onload = function() {
             adicionarProduto();
-        });
-
+        };
     </script>
 </body>
 
 </html>
     ''', prazos=prazos)
 
-
+# ROUTES ADICIONAIS
 @app.route('/health')
 def health():
     """Health check endpoint"""
@@ -1781,7 +1539,7 @@ def health():
             version = cursor.fetchone()[0]
             cursor.close()
             conn.close()
-
+            
             return jsonify({
                 'status': 'OK',
                 'database': 'PostgreSQL - Conectado',
@@ -1801,13 +1559,12 @@ def health():
             'timestamp': datetime.now().isoformat()
         }), 500
 
-
 @app.route('/clientes')
 def listar_clientes():
     """Listar clientes em JSON"""
     clientes = buscar_clientes()
     clientes_json = []
-
+    
     for cliente in clientes:
         clientes_json.append({
             'cnpj': cliente[0],
@@ -1815,19 +1572,18 @@ def listar_clientes():
             'nome_fantasia': cliente[2],
             'telefone': cliente[3] if len(cliente) > 3 else ''
         })
-
+    
     return jsonify({
         'clientes': clientes_json,
         'total': len(clientes_json)
     })
-
 
 @app.route('/precos')
 def listar_precos():
     """Listar preços em JSON"""
     precos = buscar_precos_normal()
     precos_json = []
-
+    
     for preco in precos:
         precos_json.append({
             'artigo': preco[0],
@@ -1838,153 +1594,110 @@ def listar_precos():
             'icms_7': float(preco[5]) if preco[5] else 0,
             'ret_mg': float(preco[6]) if preco[6] else 0
         })
-
+    
     return jsonify({
         'precos': precos_json,
         'total': len(precos_json)
     })
 
-
 @app.route('/api/buscar_clientes')
-def api_buscar_clientes():
-    """API para buscar clientes por termo"""
+def buscar_clientes_api():
+    """API para buscar clientes por nome/razão social"""
     query = request.args.get('q', '').strip()
-
+    
     if len(query) < 1:
         return jsonify([])
-
+    
     conn = conectar_postgresql()
     if not conn:
-        return jsonify([])
-
+        return jsonify([]), 500
+    
     try:
         cursor = conn.cursor()
-
-        # Buscar clientes que contenham o termo na razão social ou nome fantasia
+        
+        # Buscar por razão social ou nome fantasia
         cursor.execute("""
             SELECT cnpj, razao_social, nome_fantasia, telefone 
             FROM clientes 
             WHERE UPPER(razao_social) LIKE UPPER(%s) 
                OR UPPER(nome_fantasia) LIKE UPPER(%s)
-               OR cnpj LIKE %s
-            ORDER BY razao_social
+            ORDER BY razao_social 
             LIMIT 10
-        """, (f'%{query}%', f'%{query}%', f'%{query}%'))
-
-        clientes = cursor.fetchall()
+        """, (f'%{query}%', f'%{query}%'))
+        
+        resultados = cursor.fetchall()
         cursor.close()
         conn.close()
-
-        clientes_json = []
-        for cliente in clientes:
-            clientes_json.append({
-                'cnpj': cliente[0],
-                'razao_social': cliente[1],
-                'nome_fantasia': cliente[2],
-                'telefone': cliente[3] if cliente[3] else ''
+        
+        clientes = []
+        for resultado in resultados:
+            clientes.append({
+                'cnpj': resultado[0],
+                'razao_social': resultado[1],
+                'nome_fantasia': resultado[2],
+                'telefone': resultado[3] if resultado[3] else ''
             })
-
-        return jsonify(clientes_json)
-
+        
+        return jsonify(clientes)
+        
     except Exception as e:
-        print(f"Erro na busca de clientes: {e}")
+        print(f"Erro ao buscar clientes: {e}")
         if conn:
             conn.close()
-        return jsonify([])
-
+        return jsonify([]), 500
 
 @app.route('/submit_pedido', methods=['POST'])
 def submit_pedido():
-    """Processar envio do pedido"""
+    """Endpoint para receber e processar pedidos"""
     try:
-        dados = request.get_json()
-
-        print("📝 Dados recebidos do pedido:")
-        print(f"   - Cliente: {dados.get('razaoSocial')}")
-        print(f"   - Representante: {dados.get('nomeRepresentante')}")
-        print(f"   - Produtos: {len(dados.get('produtos', []))}")
-        print(f"   - Valor Total: R$ {dados.get('valorTotal', 0):.2f}")
-
-        # Salvar pedido no banco
-        numero_pedido = salvar_pedido(dados)
-
+        print("📋 Recebendo pedido...")
+        
+        # Obter dados do pedido
+        dados_pedido = request.get_json()
+        
+        if not dados_pedido:
+            return jsonify({'success': False, 'error': 'Dados do pedido não recebidos'}), 400
+        
+        print(f"📄 Dados recebidos: {dados_pedido.get('nomeRepresentante')} - {dados_pedido.get('razaoSocial')}")
+        
+        # Salvar no banco de dados
+        numero_pedido = salvar_pedido(dados_pedido)
+        
         if not numero_pedido:
-            return jsonify({
-                'sucesso': False,
-                'erro': 'Erro ao salvar pedido no banco de dados'
-            })
-
+            return jsonify({'success': False, 'error': 'Erro ao salvar pedido no banco'}), 500
+        
         print(f"✅ Pedido salvo com número: {numero_pedido}")
-
+        
         # Gerar PDF
-        pdf_buffer = gerar_pdf_pedido(dados, numero_pedido)
-
+        pdf_buffer = gerar_pdf_pedido(dados_pedido, numero_pedido)
+        
         if not pdf_buffer:
-            return jsonify({
-                'sucesso': False,
-                'erro': 'Erro ao gerar PDF do pedido'
-            })
-
+            print("⚠️ Erro ao gerar PDF, mas pedido foi salvo")
+            return jsonify({'success': True, 'numero_pedido': numero_pedido, 'warning': 'PDF não gerado'})
+        
         print("✅ PDF gerado com sucesso")
-
+        
         # Enviar email
-        email_enviado = enviar_email_pedido_completo(
-            dados, numero_pedido, pdf_buffer)
-
-        if email_enviado:
-            print("✅ Email enviado com sucesso")
-            return jsonify({
-                'sucesso': True,
-                'numero_pedido': numero_pedido,
-                'mensagem': 'Pedido enviado com sucesso! Email enviado.'
-            })
-        else:
-            print("⚠️ Pedido salvo, mas email não enviado")
-            return jsonify({
-                'sucesso': True,
-                'numero_pedido': numero_pedido,
-                'mensagem': 'Pedido salvo com sucesso, mas houve erro no envio do email.'
-            })
-
+        email_enviado = enviar_email_pedido_completo(dados_pedido, numero_pedido, pdf_buffer)
+        
+        if not email_enviado:
+            print("⚠️ Erro ao enviar email, mas pedido foi salvo")
+            return jsonify({'success': True, 'numero_pedido': numero_pedido, 'warning': 'Email não enviado'})
+        
+        print("✅ Email enviado com sucesso")
+        
+        return jsonify({
+            'success': True, 
+            'numero_pedido': numero_pedido,
+            'message': 'Pedido processado com sucesso'
+        })
+        
     except Exception as e:
-        print(f"❌ Erro no processamento do pedido: {e}")
+        print(f"❌ Erro ao processar pedido: {str(e)}")
         import traceback
         print(f"🔍 Traceback: {traceback.format_exc()}")
-
-        return jsonify({
-            'sucesso': False,
-            'erro': f'Erro interno: {str(e)}'
-        })
-
-
-@app.route('/baixar-pedido/<numero_pedido>', methods=['GET'])
-def baixar_pedido(numero_pedido):
-    """Permite baixar o PDF do pedido pelo número"""
-    conn = conectar_postgresql()
-    if not conn:
-        return "Banco não disponível", 500
-
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT dados_json FROM pedidos WHERE numero_pedido=%s", (numero_pedido,))
-        row = cursor.fetchone()
-        cursor.close()
-        conn.close()
-        if not row:
-            return "Pedido não encontrado", 404
-        dados_pedido = json.loads(row[0])
-        pdf_buffer = gerar_pdf_pedido(dados_pedido, numero_pedido)
-        if pdf_buffer is None:
-            return "Erro ao gerar PDF", 500
-        return send_file(pdf_buffer, as_attachment=True,
-                         download_name=f"Pedido_DTX_{numero_pedido}.pdf",
-                         mimetype='application/pdf'
-                         )
-    except Exception as e:
-        print(f"Erro no download: {e}")
-        return "Erro inesperado", 500
-
+        
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Inicializar banco de dados
@@ -1994,9 +1707,9 @@ if __name__ == '__main__':
         print("🔗 Health check: http://127.0.0.1:5001/health")
         print("👥 Clientes: http://127.0.0.1:5001/clientes")
         print("💰 Preços: http://127.0.0.1:5001/precos")
-        print("📋 Criar Pedido: http://127.0.0.1:5001/criar-pedido")
+        print("📋 Criar pedido: http://127.0.0.1:5001/criar-pedido")
         print("-" * 50)
-
+        
         app.run(host='0.0.0.0', port=5001, debug=True)
     else:
         print("❌ Falha na inicialização do banco de dados")

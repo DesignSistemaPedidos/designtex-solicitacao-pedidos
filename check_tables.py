@@ -1,43 +1,52 @@
 import psycopg2
+import os
 
-def verificar_tabelas_railway():
-    """Verificar exatamente que tabelas existem no Railway"""
+def verificar_estrutura_tabelas():
+    """Verificar estrutura das tabelas"""
     
-    database_url = "postgresql://postgres:zGgADknoSZLTjavfpImTgTBAVSicvJNY@metro.proxy.rlwy.net:47441/railway"
+    # Configuração baseada no .env
+    environment = os.getenv('ENVIRONMENT', 'development')
+    
+    if environment == 'production':
+        print("🌐 Verificando tabelas no RAILWAY")
+        database_url = "postgresql://postgres:zGgADknoSZLTjavfpImTgTBAVSicvJNY@metro.proxy.rlwy.net:47441/railway"
+        conn = psycopg2.connect(database_url)
+    else:
+        print("🏠 Verificando tabelas no LOCAL")
+        conn = psycopg2.connect(
+            host='localhost',
+            database='designtex_db',
+            user='postgres',
+            password='sua_senha_local',
+            port='5432'
+        )
     
     try:
-        print("🔍 DIAGNÓSTICO - TABELAS NO RAILWAY")
-        print("=" * 50)
-        
-        conn = psycopg2.connect(database_url)
         cursor = conn.cursor()
         
-        # Listar TODAS as tabelas
+        # Verificar estrutura da tabela pedidos
         cursor.execute("""
-            SELECT schemaname, tablename 
-            FROM pg_tables 
-            WHERE schemaname = 'public'
-            ORDER BY tablename
+            SELECT column_name, data_type, is_nullable, column_default
+            FROM information_schema.columns 
+            WHERE table_name = 'pedidos' AND table_schema = 'public'
+            ORDER BY ordinal_position
         """)
-        tabelas = cursor.fetchall()
         
-        print(f"📋 TABELAS ENCONTRADAS: {len(tabelas)}")
-        for schema, tabela in tabelas:
-            print(f"   ✅ {schema}.{tabela}")
+        colunas = cursor.fetchall()
         
-        # Se não tem tabelas, listar todos os schemas
-        if not tabelas:
-            print("\n🔍 VERIFICANDO OUTROS SCHEMAS...")
-            cursor.execute("SELECT schema_name FROM information_schema.schemata")
-            schemas = cursor.fetchall()
-            for schema in schemas:
-                print(f"   📂 Schema: {schema[0]}")
+        print("\n📋 ESTRUTURA ATUAL DA TABELA PEDIDOS:")
+        print("-" * 60)
+        for coluna in colunas:
+            nome, tipo, nulo, default = coluna
+            print(f"   📄 {nome} | {tipo} | NULL: {nulo} | Default: {default}")
+        
+        print(f"\n✅ Total de colunas: {len(colunas)}")
         
         cursor.close()
         conn.close()
         
     except Exception as e:
-        print(f"❌ Erro no diagnóstico: {e}")
+        print(f"❌ Erro: {e}")
 
 if __name__ == '__main__':
-    verificar_tabelas_railway()
+    verificar_estrutura_tabelas()

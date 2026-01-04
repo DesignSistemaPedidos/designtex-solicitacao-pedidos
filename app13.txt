@@ -6,7 +6,7 @@ from flask import Flask, render_template_string, request, jsonify, send_file, re
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-from reportlab.lib.units import mm, cm
+from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -93,7 +93,6 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
     from reportlab.lib.units import mm, cm
-    import io
 
     try:
         buffer = io.BytesIO()
@@ -114,7 +113,7 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
             Paragraph(f"PEDIDO DE VENDAS Nº {numero_pedido}", title_style))
         story.append(Spacer(1, 20))
 
-        # Dados do cliente
+        # Dados
         cliente_data = [
             ['DADOS DO CLIENTE', ''],
             ['Representante:', dados_pedido.get('nomeRepresentante', '')],
@@ -122,7 +121,6 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
             ['CNPJ:', dados_pedido.get('cnpj', '')],
             ['Telefone:', dados_pedido.get('telefone', '')],
         ]
-
         cliente_table = Table(cliente_data, colWidths=[4*cm, 12*cm])
         cliente_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (1, 0), colors.grey),
@@ -135,32 +133,6 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
             ('GRID', (0, 0), (-1, -1), 1, colors.black)
         ]))
         story.append(cliente_table)
-        story.append(Spacer(1, 20))
-
-        # Condições do pedido (adapte se precisar)
-        condicoes_data = [
-            ['CONDIÇÕES DO PEDIDO', ''],
-            ['Tipo Pedido:', dados_pedido.get('tipoPedido', '')],
-            ['Número OP:', dados_pedido.get('numeroOP', 'N/A')],
-            ['Tabela Preços:', dados_pedido.get('tabelaPrecos', '')],
-            ['Tipo Produto:', dados_pedido.get('tipoProduto', '')],
-            ['Tipo Frete:', dados_pedido.get('tipoFrete', '')],
-            ['Venda Triangular:', dados_pedido.get('vendaTriangular', '')],
-            ['Regime RET:', dados_pedido.get('regimeRET', '')],
-        ]
-
-        condicoes_table = Table(condicoes_data, colWidths=[4*cm, 12*cm])
-        condicoes_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (1, 0), colors.grey),
-            ('TEXTCOLOR', (0, 0), (1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        story.append(condicoes_table)
         story.append(Spacer(1, 20))
 
         # Produtos
@@ -199,12 +171,10 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
             story.append(Paragraph(dados_pedido.get(
                 'observacoes'), styles['Normal']))
 
-        # Rodapé
         story.append(Spacer(1, 30))
         story.append(Paragraph(
             f"Pedido gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
 
-        # Gerar PDF
         doc.build(story)
         buffer.seek(0)
         return buffer
@@ -780,27 +750,27 @@ def salvar_pedido(dados_pedido):
 
 def gerar_pdf_pedido(dados_pedido, numero_pedido):
     """Gerar PDF do pedido"""
-    from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib import colors
-    from reportlab.lib.units import mm, cm
-    import io
-
     try:
+        # Criar buffer em memória
         buffer = io.BytesIO()
+
+        # Criar documento PDF
         doc = SimpleDocTemplate(buffer, pagesize=A4,
                                 rightMargin=20*mm, leftMargin=20*mm,
                                 topMargin=20*mm, bottomMargin=20*mm)
 
+        # Estilos
         styles = getSampleStyleSheet()
         title_style = ParagraphStyle('CustomTitle',
                                      parent=styles['Heading1'],
                                      fontSize=16,
                                      spaceAfter=30,
-                                     alignment=1)
+                                     alignment=1)  # Centralizado
 
+        # Conteúdo do PDF
         story = []
+
+        # Cabeçalho
         story.append(Paragraph("DESIGNTEX TECIDOS", title_style))
         story.append(
             Paragraph(f"PEDIDO DE VENDAS Nº {numero_pedido}", title_style))
@@ -829,7 +799,7 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
         story.append(cliente_table)
         story.append(Spacer(1, 20))
 
-        # Condições do pedido (adapte se precisar)
+        # Condições do pedido
         condicoes_data = [
             ['CONDIÇÕES DO PEDIDO', ''],
             ['Tipo Pedido:', dados_pedido.get('tipoPedido', '')],
@@ -858,6 +828,7 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
         # Produtos
         produtos_data = [['Artigo', 'Código',
                           'Desenho/Cor', 'Metragem', 'Preço', 'Subtotal']]
+
         for produto in dados_pedido.get('produtos', []):
             produtos_data.append([
                 produto.get('artigo', ''),
@@ -867,8 +838,11 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
                 f"R$ {produto.get('preco', 0):.2f}",
                 f"R$ {produto.get('subtotal', 0):.2f}"
             ])
+
+        # Total
         produtos_data.append(
             ['', '', '', '', 'TOTAL:', f"R$ {dados_pedido.get('valorTotal', 0):.2f}"])
+
         produtos_table = Table(produtos_data, colWidths=[
                                3*cm, 2*cm, 4*cm, 2*cm, 2.5*cm, 2.5*cm])
         produtos_table.setStyle(TableStyle([
@@ -898,6 +872,8 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
 
         # Gerar PDF
         doc.build(story)
+
+        # Retornar buffer
         buffer.seek(0)
         return buffer
 

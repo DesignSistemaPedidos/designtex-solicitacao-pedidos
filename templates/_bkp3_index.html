@@ -88,20 +88,6 @@
             background-color: #134072;
             border-color: #134072;
         }
-
-        /* NOVO: Estilo para botão de teste */
-        .test-button {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 9999;
-            background: #dc3545;
-            color: white;
-            border: none;
-            border-radius: 50px;
-            padding: 10px 20px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        }
     </style>
 </head>
 
@@ -156,14 +142,9 @@
                             <label for="prazoPagamento" class="form-label">Prazo de Pagamento *</label>
                             <select class="form-select" id="prazoPagamento" required>
                                 <option value="">Selecione...</option>
-                                <option value="À Vista">À Vista</option>
-                                <option value="7 dias">7 dias</option>
-                                <option value="14 dias">14 dias</option>
-                                <option value="21 dias">21 dias</option>
-                                <option value="28 dias">28 dias</option>
-                                <option value="30 dias">30 dias</option>
-                                <option value="45 dias">45 dias</option>
-                                <option value="60 dias">60 dias</option>
+                                {% for prazo in prazos %}
+                                <option value="{{ prazo }}">{{ prazo }}</option>
+                                {% endfor %}
                             </select>
                         </div>
 
@@ -357,11 +338,6 @@
         </form>
     </div>
 
-    <!-- BOTÃO FLUTUANTE DE TESTE RAILWAY -->
-    <button class="test-button" onclick="testarRailway()" title="Testar conexão Railway">
-        🌐 Teste Railway
-    </button>
-
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -374,64 +350,6 @@
 
         let contadorProdutos = 0;
         let timeoutId;
-
-        // ========== TESTE RAILWAY (NOVO) ==========
-        function testarRailway() {
-            console.log('🌐 TESTANDO RAILWAY...');
-            
-            const btnTeste = document.querySelector('.test-button');
-            const originalText = btnTeste.innerHTML;
-            
-            btnTeste.innerHTML = '⏳ Testando...';
-            btnTeste.disabled = true;
-            
-            // Teste 1: Health Check
-            fetch('/health')
-                .then(response => response.json())
-                .then(data => {
-                    console.log('✅ Health Check:', data);
-                    
-                    if (data.status === 'OK') {
-                        alert(`✅ RAILWAY CONECTADO!\n\nDatabase: ${data.database}\nVersion: ${data.version}\nTimestamp: ${data.timestamp}`);
-                    } else {
-                        alert(`❌ Erro no Health Check: ${data.database}`);
-                    }
-                })
-                .catch(error => {
-                    console.error('❌ Erro Health Check:', error);
-                    alert(`❌ Erro na conexão: ${error.message}`);
-                })
-                .finally(() => {
-                    btnTeste.innerHTML = originalText;
-                    btnTeste.disabled = false;
-                });
-            
-            // Teste 2: Buscar Clientes
-            setTimeout(() => {
-                fetch('/clientes')
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log('👥 Clientes:', data);
-                        alert(`👥 CLIENTES RAILWAY: ${data.total} encontrados`);
-                    })
-                    .catch(error => {
-                        console.error('❌ Erro clientes:', error);
-                    });
-            }, 1000);
-            
-            // Teste 3: Buscar Preços
-            setTimeout(() => {
-                fetch('/precos')
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log('💰 Preços:', data);
-                        alert(`💰 PREÇOS RAILWAY: ${data.total} encontrados`);
-                    })
-                    .catch(error => {
-                        console.error('❌ Erro preços:', error);
-                    });
-            }, 2000);
-        }
 
         // ========== AUTOCOMPLETE DE CLIENTES ==========
         document.getElementById('razaoSocial').addEventListener('input', function (e) {
@@ -507,22 +425,6 @@
         document.addEventListener('click', function (e) {
             if (!e.target.closest('.autocomplete-container')) {
                 document.getElementById('autocomplete-dropdown').style.display = 'none';
-            }
-        });
-
-        // ========== CAMPO NÚMERO DA OP ==========
-        document.getElementById('tipoPedido').addEventListener('change', function () {
-            const tipoPedido = this.value;
-            const campoNumeroOP = document.getElementById('campoNumeroOP');
-            const inputNumeroOP = document.getElementById('numeroOP');
-
-            if (tipoPedido === 'OP') {
-                campoNumeroOP.style.display = 'block';
-                inputNumeroOP.required = true;
-            } else {
-                campoNumeroOP.style.display = 'none';
-                inputNumeroOP.required = false;
-                inputNumeroOP.value = '';
             }
         });
 
@@ -644,6 +546,204 @@
             contador.textContent = this.value.length;
         });
 
+        // ========== ENVIO DO FORMULÁRIO ==========
+        document.getElementById('pedidoForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            if (!validarFormulario()) {
+                return;
+            }
+
+            const dados = coletarDados();
+            enviarPedido(dados);
+        });
+
+        function validarFormulario() {
+            // Validar se tem pelo menos um produto
+            const produtos = document.querySelectorAll('.produto-item');
+            if (produtos.length === 0) {
+                alert('Adicione pelo menos um produto!');
+                return false;
+            }
+
+            // Validar se todos os campos obrigatórios estão preenchidos
+            const camposObrigatorios = document.querySelectorAll('[required]');
+            for (let campo of camposObrigatorios) {
+                if (!campo.value.trim()) {
+                    alert(`Campo obrigatório não preenchido: ${campo.previousElementSibling.textContent}`);
+                    campo.focus();
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        function coletarDados() {
+            const produtos = [];
+            document.querySelectorAll('.produto-item').forEach(produto => {
+                const artigo = produto.querySelector('input[name="artigo"]').value;
+                const codigo = produto.querySelector('input[name="codigo"]').value;
+                const desenho_cor = produto.querySelector('input[name="desenho_cor"]').value;
+                const metragem = parseFloat(produto.querySelector('input[name="metragem"]').value);
+                const preco = parseFloat(produto.querySelector('input[name="preco"]').value);
+
+                produtos.push({
+                    artigo,
+                    codigo,
+                    desenho_cor,
+                    metragem,
+                    preco,
+                    subtotal: metragem * preco
+                });
+            });
+
+            return {
+                nomeRepresentante: document.getElementById('nomeRepresentante').value,
+                razaoSocial: document.getElementById('razaoSocial').value,
+                cnpj: document.getElementById('cnpj').value,
+                telefone: document.getElementById('telefone').value,
+                prazoPagamento: document.getElementById('prazoPagamento').value,
+                tipoPedido: document.getElementById('tipoPedido').value,
+                tipoFrete: document.getElementById('tipoFrete').value,
+                transportadoraFOB: document.getElementById('transportadoraFOB').value,
+                transportadoraCIF: document.getElementById('transportadoraCIF').value,
+                vendaTriangular: document.getElementById('vendaTriangular').value,
+                dadosTriangulacao: document.getElementById('dadosTriangulacao').value,
+                regimeRET: document.getElementById('regimeRET').value,
+                tipoProduto: document.getElementById('tipoProduto').value,
+                icmsNormal: document.querySelector('input[name="icmsNormal"]:checked')?.value,
+                icmsLD: document.querySelector('input[name="icmsLD"]:checked')?.value,
+                produtos: produtos,
+                valorTotal: produtos.reduce((sum, p) => sum + p.subtotal, 0),
+                observacoes: document.getElementById('observacoes').value
+            };
+        }
+
+        function enviarPedido(dados) {
+            const btnEnviar = document.querySelector('button[type="submit"]');
+            btnEnviar.disabled = true;
+            btnEnviar.innerHTML = '⏳ Enviando...';
+
+            fetch('/submit_pedido', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(dados)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`✅ ${data.message}`);
+
+                        // Enviar por email (configure sua chave do EmailJS)
+                        /*
+                        emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', {
+                            to_email: 'pedido@designtextecidos.com.br',
+                            pedido_numero: data.numero_pedido,
+                            representante: dados.nomeRepresentante,
+                            cliente: dados.razaoSocial,
+                            valor_total: data.valor_total
+                        });
+                        */
+
+                        // Limpar formulário
+                        limparFormulario();
+                    } else {
+                        alert(`❌ Erro: ${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('❌ Erro ao enviar pedido. Tente novamente.');
+                })
+                .finally(() => {
+                    btnEnviar.disabled = false;
+                    btnEnviar.innerHTML = '📤 Enviar Pedido';
+                });
+        }
+
+        function limparFormulario() {
+            document.getElementById('pedidoForm').reset();
+            document.getElementById('produtos-container').innerHTML = '';
+            document.getElementById('valorTotal').textContent = '0,00';
+            document.getElementById('contadorCaracteres').textContent = '0';
+            contadorProdutos = 0;
+            limparDadosCliente();
+        }
+
+        // Adicionar primeiro produto ao carregar
+        window.addEventListener('load', function () {
+            adicionarProduto();
+        });
+        // Adicionar no final do arquivo index.html, dentro do <script>
+
+        function enviarPedido(dados) {
+            const btnEnviar = document.querySelector('button[type="submit"]');
+            btnEnviar.disabled = true;
+            btnEnviar.innerHTML = '⏳ Enviando...';
+
+            fetch('/submit_pedido', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(dados)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(`✅ ${data.message}`);
+
+                        // DOWNLOAD AUTOMÁTICO DO PDF
+                        if (data.pdf_url) {
+                            console.log('Fazendo download do PDF...');
+                            const link = document.createElement('a');
+                            link.href = data.pdf_url;
+                            link.download = `Pedido_${data.numero_pedido}.pdf`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }
+
+                        // Mostrar status do email
+                        if (data.email_enviado) {
+                            alert('📧 Email enviado com sucesso para pedido@designtextecidos.com.br');
+                        } else {
+                            alert('⚠️ Email não foi enviado. Verifique as configurações.');
+                        }
+
+                        limparFormulario();
+                    } else {
+                        alert(`❌ Erro: ${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    alert('❌ Erro ao enviar pedido. Tente novamente.');
+                })
+                .finally(() => {
+                    btnEnviar.disabled = false;
+                    btnEnviar.innerHTML = '📤 Enviar Pedido';
+                });
+        }
+        // ========== CAMPO NÚMERO DA OP ==========
+        document.getElementById('tipoPedido').addEventListener('change', function () {
+            const tipoPedido = this.value;
+            const campoNumeroOP = document.getElementById('campoNumeroOP');
+            const inputNumeroOP = document.getElementById('numeroOP');
+
+            if (tipoPedido === 'OP') {
+                campoNumeroOP.style.display = 'block';
+                inputNumeroOP.required = true;
+            } else {
+                campoNumeroOP.style.display = 'none';
+                inputNumeroOP.required = false;
+                inputNumeroOP.value = '';
+            }
+        });
+
         // ========== VALIDAÇÃO DE ICMS ==========
         function validarFormulario() {
             // Validar se tem pelo menos um produto
@@ -709,7 +809,7 @@
                 telefone: document.getElementById('telefone').value,
                 prazoPagamento: document.getElementById('prazoPagamento').value,
                 tipoPedido: document.getElementById('tipoPedido').value,
-                numeroOP: document.getElementById('numeroOP').value,
+                numeroOP: document.getElementById('numeroOP').value, // NOVO
                 tipoFrete: document.getElementById('tipoFrete').value,
                 transportadoraFOB: document.getElementById('transportadoraFOB').value,
                 transportadoraCIF: document.getElementById('transportadoraCIF').value,
@@ -717,90 +817,105 @@
                 dadosTriangulacao: document.getElementById('dadosTriangulacao').value,
                 regimeRET: document.getElementById('regimeRET').value,
                 tipoProduto: document.getElementById('tipoProduto').value,
-                tabelaPrecos: document.querySelector('input[name="tabelaPrecos"]:checked')?.value,
+                tabelaPrecos: document.querySelector('input[name="tabelaPrecos"]:checked')?.value, // CORRIGIDO
                 produtos: produtos,
                 valorTotal: produtos.reduce((sum, p) => sum + p.subtotal, 0),
                 observacoes: document.getElementById('observacoes').value
             };
         }
 
-        // ========== ENVIO DO FORMULÁRIO ==========
-        document.getElementById('pedidoForm').addEventListener('submit', function (e) {
-            e.preventDefault();
-
-            if (!validarFormulario()) {
-                return;
-            }
-
-            const dados = coletarDados();
-            enviarPedido(dados);
-        });
-
-        function enviarPedido(dados) {
-            const btnEnviar = document.querySelector('button[type="submit"]');
-            btnEnviar.disabled = true;
-            btnEnviar.innerHTML = '⏳ Enviando...';
-
-            fetch('/submit_pedido', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(dados)
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert(`✅ ${data.message}`);
-
-                        // DOWNLOAD AUTOMÁTICO DO PDF
-                        if (data.pdf_url) {
-                            console.log('Fazendo download do PDF...');
-                            const link = document.createElement('a');
-                            link.href = data.pdf_url;
-                            link.download = `Pedido_${data.numero_pedido}.pdf`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                        }
-
-                        // Mostrar status do email
-                        if (data.email_enviado) {
-                            alert('📧 Email enviado com sucesso para pedido@designtextecidos.com.br');
-                        } else {
-                            alert('⚠️ Email não foi enviado. Verifique as configurações.');
-                        }
-
-                        limparFormulario();
-                    } else {
-                        alert(`❌ Erro: ${data.message}`);
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro:', error);
-                    alert('❌ Erro ao enviar pedido. Tente novamente.');
-                })
-                .finally(() => {
-                    btnEnviar.disabled = false;
-                    btnEnviar.innerHTML = '📤 Enviar Pedido';
-                });
-        }
-
-        function limparFormulario() {
-            document.getElementById('pedidoForm').reset();
-            document.getElementById('produtos-container').innerHTML = '';
-            document.getElementById('valorTotal').textContent = '0,00';
-            document.getElementById('contadorCaracteres').textContent = '0';
-            contadorProdutos = 0;
-            limparDadosCliente();
-        }
-
-        // Adicionar primeiro produto ao carregar
-        window.addEventListener('load', function () {
-            adicionarProduto();
-        });
 
     </script>
 </body>
 
 </html>
+<script>
+    // Autocomplete para clientes
+    const razaoSocialInput = document.getElementById('razaoSocial');
+    const autocompleteDropdown = document.getElementById('autocomplete-dropdown');
+    const cnpjInput = document.getElementById('cnpj');
+    const telefoneInput = document.getElementById('telefone');
+
+    let timeoutId;
+
+    razaoSocialInput.addEventListener('input', function () {
+        clearTimeout(timeoutId);
+        const query = this.value.trim();
+
+        if (query.length < 2) {
+            autocompleteDropdown.style.display = 'none';
+            return;
+        }
+
+        timeoutId = setTimeout(() => {
+            fetch(`/api/buscar_clientes?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(clientes => {
+                    autocompleteDropdown.innerHTML = '';
+
+                    if (clientes.length === 0) {
+                        autocompleteDropdown.innerHTML = '<div class="autocomplete-item">Nenhum cliente encontrado</div>';
+                    } else {
+                        clientes.forEach(cliente => {
+                            const item = document.createElement('div');
+                            item.className = 'autocomplete-item';
+                            item.innerHTML = `<strong>${cliente.razaoSocial}</strong><br><small>CNPJ: ${cliente.cnpj}</small>`;
+                            item.onclick = () => selecionarCliente(cliente);
+                            autocompleteDropdown.appendChild(item);
+                        });
+                    }
+
+                    autocompleteDropdown.style.display = 'block';
+                })
+                .catch(error => console.error('Erro na busca:', error));
+        }, 300);
+    });
+
+    function selecionarCliente(cliente) {
+        razaoSocialInput.value = cliente.razaoSocial;
+        cnpjInput.value = cliente.cnpj;
+        telefoneInput.value = cliente.telefone || '';
+        autocompleteDropdown.style.display = 'none';
+    }
+
+    // Fechar dropdown ao clicar fora
+    document.addEventListener('click', function (event) {
+        if (!event.target.closest('.autocomplete-container')) {
+            autocompleteDropdown.style.display = 'none';
+        }
+    });
+
+    // Submissão do formulário
+    document.getElementById('pedidoForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+
+        // Coletar dados do formulário
+        const formData = new FormData(this);
+        const dados = Object.fromEntries(formData);
+
+        // Coletar produtos (você precisa implementar a parte de produtos)
+        dados.produtos = []; // Implementar coleta de produtos
+
+        // Enviar para o servidor
+        fetch('/submit_pedido', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(dados)
+        })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    alert(`✅ Pedido ${result.numeroPedido} criado com sucesso!\nEmail enviado: ${result.emailEnviado ? 'Sim' : 'Não'}`);
+                    // Redirecionar ou limpar formulário
+                } else {
+                    alert(`❌ Erro: ${result.error}`);
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('❌ Erro ao enviar pedido');
+            });
+    });
+</script>

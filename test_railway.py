@@ -10,7 +10,7 @@ def testar_railway():
     print("-" * 50)
 
     # URL do Railway
-    database_url = "postgresql://postgres:zGgADknoSZLTjavfpImTgTBAVSicvJNY@metro.proxy.rlwy.net:47441/railway"
+    database_url = "postgresql://postgres:JKOUPjecfpgkdvSOGUepsTvyloqygzFw@centerbeam.proxy.rlwy.net:15242/railway"
 
     encodings = ['UTF8', 'LATIN1', 'SQL_ASCII']
 

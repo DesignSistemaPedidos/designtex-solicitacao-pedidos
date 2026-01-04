@@ -7,7 +7,7 @@ Configure suas credenciais de email aqui
 EMAIL_CONFIG = {
     'smtp_server': 'smtp.gmail.com',
     'smtp_port': 587,
-    'email_remetente': 'SEU_EMAIL@gmail.com',  # ← ALTERE AQUI
+    'email_remetente': 'design.designtextecidos@gmail.com',  # ← ALTERE AQUI
     'senha_email': 'SUA_SENHA_APP',            # ← ALTERE AQUI
     'email_destino': 'pedido@designtextecidos.com.br',
     'nome_empresa': 'DTX Design Têxtil'
