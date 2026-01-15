@@ -1,3 +1,4 @@
+from threading import Lock
 import os
 import sys
 import locale
@@ -595,6 +596,37 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
 # Flask app
 # -----------------------------------------------------------------------------
 app = Flask(__name__)
+
+
+_db_init_lock = Lock()
+_db_initialized = False
+
+
+def ensure_db_initialized():
+    global _db_initialized
+    if _db_initialized:
+        return
+    with _db_init_lock:
+        if _db_initialized:
+            return
+        ok = init_database()
+        if not ok:
+            print("❌ Falha ao inicializar o banco")
+        else:
+            print("✅ Banco inicializado/validado")
+        _db_initialized = True
+
+
+# Preferível (Flask >= 2.2/2.3)
+if hasattr(app, "before_serving"):
+    @app.before_serving
+    def _init_db_before_serving():
+        ensure_db_initialized()
+# Fallback para versões sem before_serving (ou se quiser garantir)
+else:
+    @app.before_request
+    def _init_db_before_request():
+        ensure_db_initialized()
 
 
 @app.route('/health')
@@ -1464,7 +1496,13 @@ def baixar_pedido(numero_pedido):
 # Main
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    init_database()
-    host, port, debug = get_port_and_host()
-    print(f"🚀 Servidor em http://{host}:{port}")
-    app.run(host=host, port=port, debug=debug)
+    with app.app_context():
+        ensure_db_initialized()  # garante no dev
+    print("🚀 Iniciando DESIGNTEX TECIDOS - PostgreSQL Web")
+    print("📡 Servidor rodando em: http://127.0.0.1:8080")
+    print("🔗 Health check: http://127.0.0.1:8080/health")
+    print("👥 Clientes: http://127.0.0.1:8080/clientes")
+    print("💰 Preços: http://127.0.0.1:8080/precos")
+    print("📋 Criar Pedido: http://127.0.0.1:8080/criar-pedido")
+    print("-" * 50)
+    app.run(host='0.0.0.0', port=8080, debug=True)
