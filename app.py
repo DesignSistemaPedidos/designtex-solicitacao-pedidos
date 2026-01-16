@@ -1,3 +1,4 @@
+import click
 from threading import Lock
 import os
 import sys
@@ -440,7 +441,9 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
     from reportlab.lib import colors
     from reportlab.lib.units import mm, cm
 
-    LOGO_CAMINHO = "logo-dtx.png"  # ajuste se necessário
+    # Caminho absoluto do logo (dentro de /static)
+    logo_abspath = os.path.join(
+        current_app.root_path, 'static', 'logo-dtx.png')
     EMPRESA_INFOS = [
         "Telefone: (31) 3286-2853",
         "Endereço: Av. Barão Homem de Melo, 1275 - Nova Granada - Belo Horizonte/MG - 30431-285",
@@ -465,12 +468,18 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
 
         story = []
 
-        # Topo com logo
+        # Logo + Infos
         try:
-            img = Image(LOGO_CAMINHO, width=200, height=59)
-            img.hAlign = 'CENTER'
-            story.append(img)
-        except Exception:
+            if os.path.exists(logo_abspath):
+                img = Image(logo_abspath, width=200, height=59)
+                img.hAlign = 'CENTER'
+                story.append(img)
+            else:
+                print(f"⚠️ Logo não encontrado em: {logo_abspath}")
+                story.append(
+                    Paragraph("<b>DESIGNTEX TECIDOS</b>", title_style))
+        except Exception as img_e:
+            print(f"⚠️ Erro ao carregar logo: {img_e}")
             story.append(Paragraph("<b>DESIGNTEX TECIDOS</b>", title_style))
 
         for info in EMPRESA_INFOS:
@@ -597,8 +606,6 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
 # -----------------------------------------------------------------------------
 app = Flask(__name__)
 
-# Rodar init_database no primeiro request em produção (idempotente)
-
 
 # Inicializa DB ao importar o módulo (produção)
 if os.getenv('INIT_DB_ON_START', 'true').lower() == 'true':
@@ -606,6 +613,17 @@ if os.getenv('INIT_DB_ON_START', 'true').lower() == 'true':
         init_database()
     except Exception as e:
         print(f"⚠️ Erro ao inicializar DB no import: {e}")
+
+
+@app.cli.command('init-db')
+def cli_init_db():
+    """Inicializa o banco (cria tabelas e dados iniciais)."""
+    ok = init_database()
+    if ok:
+        click.echo('✅ Banco inicializado com sucesso')
+    else:
+        click.echo('❌ Falha na inicialização do banco', err=True)
+        raise SystemExit(1)
 
 
 _db_init_lock = Lock()
@@ -1505,6 +1523,7 @@ def baixar_pedido(numero_pedido):
 # -----------------------------------------------------------------------------
 # Main
 # -----------------------------------------------------------------------------
+# somente para desenvolvimento local
 if __name__ == '__main__':
     port = int(os.getenv('PORT', '8080'))
     debug = os.getenv('DEBUG', 'false').lower() == 'true'
