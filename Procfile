@@ -1,2 +1,2 @@
-web: gunicorn -w 2 -k gthread -t 120 -b 0.0.0.0:$PORT app:app
-
+release: flask --app app init-db
+web: gunicorn app:app --bind 0.0.0.0:$PORT
