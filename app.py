@@ -892,7 +892,8 @@ function carregarArtigosDoBanco(callback) {
         .then(dados => {
             listaArtigosComPrecos = dados;
             if (typeof callback === "function") callback();
-        });
+        })
+        .catch(err => console.error('Erro ao carregar artigos:', err));
 }
 
 function getTipoPrecoAtual() {
@@ -981,7 +982,7 @@ function adicionarProduto() {
             </div>
         </div>
         <div class="text-end">
-            <strong>Subtotal: R$ <span class="subtotal" data-produto="${contadorProdutos}">0,00</span></strong>
+            <strong>Subtotal: R$ <span class="subtotal" data-produto="${contadorProdutos}">0.00</span></strong>
         </div>
     `;
     container.appendChild(produtoDiv);
@@ -1020,7 +1021,7 @@ function adicionarEventListenersProduto(id) {
 
 function preencherCodigoEPreco(id, artigoSelecionado) {
     tipoPrecoAtual = getTipoPrecoAtual();
-    const artigoObj = listaArtigosComPrecos.find(a => 
+    const artigoObj = listaArtigosComPrecos.find(a =>
         a.artigo === artigoSelecionado && (
            (tipoPrecoAtual === 'ld' && a.tabela === 'ld') ||
            (tipoPrecoAtual !== 'ld' && a.tabela === 'normal')
