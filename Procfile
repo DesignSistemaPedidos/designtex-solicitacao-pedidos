@@ -1,2 +1,4 @@
 release: flask --app app init-db
-web: gunicorn app:app --bind 0.0.0.0:$PORT
+FLASK_APP=app flask run -p 8080
+
+
