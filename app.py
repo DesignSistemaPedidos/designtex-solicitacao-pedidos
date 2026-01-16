@@ -1525,6 +1525,7 @@ def baixar_pedido(numero_pedido):
 # -----------------------------------------------------------------------------
 # somente para desenvolvimento local
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', '8080'))
-    debug = os.getenv('DEBUG', 'false').lower() == 'true'
+    import os
+    port = int(os.environ.get('PORT', 5001))
+    debug = os.environ.get('FLASK_ENV', 'development') != 'production'
     app.run(host='0.0.0.0', port=port, debug=debug)

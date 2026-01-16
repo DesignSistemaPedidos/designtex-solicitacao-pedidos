@@ -2,7 +2,7 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "FLASK_APP=app flask run -p 8080"
+startCommand = "gunicorn -w 2 -k gthread -t 120 -b 0.0.0.0:$PORT app:app"
 
 [env]
 ENVIRONMENT = "production"
