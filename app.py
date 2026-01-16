@@ -597,6 +597,19 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
 # -----------------------------------------------------------------------------
 app = Flask(__name__)
 
+# Rodar init_database no primeiro request em produção (idempotente)
+
+
+@app.before_first_request
+def _init_db_prod():
+    try:
+        if os.getenv('ENVIRONMENT', '').lower() == 'production':
+            print('🚀 Inicializando DB (produção) via before_first_request...')
+            init_database()
+    except Exception as e:
+        print(f'⚠️ Falha ao inicializar DB (produção): {e}')
+
+
 # Inicializa DB ao importar o módulo (produção)
 if os.getenv('INIT_DB_ON_START', 'true').lower() == 'true':
     try:
