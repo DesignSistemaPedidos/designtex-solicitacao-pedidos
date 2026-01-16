@@ -597,6 +597,13 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
 # -----------------------------------------------------------------------------
 app = Flask(__name__)
 
+# Inicializa DB ao importar o módulo (produção)
+if os.getenv('INIT_DB_ON_START', 'true').lower() == 'true':
+    try:
+        init_database()
+    except Exception as e:
+        print(f"⚠️ Erro ao inicializar DB no import: {e}")
+
 
 _db_init_lock = Lock()
 _db_initialized = False
@@ -1496,13 +1503,6 @@ def baixar_pedido(numero_pedido):
 # Main
 # -----------------------------------------------------------------------------
 if __name__ == '__main__':
-    with app.app_context():
-        ensure_db_initialized()  # garante no dev
-    print("🚀 Iniciando DESIGNTEX TECIDOS - PostgreSQL Web")
-    print("📡 Servidor rodando em: http://127.0.0.1:8080")
-    print("🔗 Health check: http://127.0.0.1:8080/health")
-    print("👥 Clientes: http://127.0.0.1:8080/clientes")
-    print("💰 Preços: http://127.0.0.1:8080/precos")
-    print("📋 Criar Pedido: http://127.0.0.1:8080/criar-pedido")
-    print("-" * 50)
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    port = int(os.getenv('PORT', '8080'))
+    debug = os.getenv('DEBUG', 'false').lower() == 'true'
+    app.run(host='0.0.0.0', port=port, debug=debug)
