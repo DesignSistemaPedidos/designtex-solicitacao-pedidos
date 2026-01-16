@@ -1,2 +1,2 @@
-web: gunicorn app:app --workers 2 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT
+web: gunicorn -w 2 -k gthread -t 120 -b 0.0.0.0:$PORT app:app
 
