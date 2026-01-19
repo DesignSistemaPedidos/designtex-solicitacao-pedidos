@@ -1,4 +1,3 @@
-release: flask --app app init-db
-FLASK_APP=app flask run -p 8080
+web: gunicorn --bind 0.0.0.0:8080 --workers 1 --threads 2 --timeout 120 --preload app:app
 
 
