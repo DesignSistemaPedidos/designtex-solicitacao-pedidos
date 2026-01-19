@@ -17,14 +17,14 @@ class AutocompleteCliente {
             const responseClientes = await fetch('/clientes');
             const dadosClientes = await responseClientes.json();
             clientesCache = dadosClientes.clientes || [];
-            
+
             // Carregar preços do Railway
             const responsePrecos = await fetch('/precos');
             const dadosPrecos = await responsePrecos.json();
             precosCache = dadosPrecos.precos || [];
-            
+
             console.log(`✅ Carregados ${clientesCache.length} clientes e ${precosCache.length} preços do Railway`);
-            
+
         } catch (error) {
             console.error('❌ Erro ao carregar dados iniciais:', error);
             // Fallback para dados locais se necessário
@@ -63,7 +63,7 @@ class AutocompleteCliente {
 
         try {
             // Buscar primeiro no cache
-            let resultados = clientesCache.filter(cliente => 
+            let resultados = clientesCache.filter(cliente =>
                 cliente.razao_social.toLowerCase().includes(termo.toLowerCase()) ||
                 cliente.nome_fantasia.toLowerCase().includes(termo.toLowerCase())
             );
@@ -79,7 +79,7 @@ class AutocompleteCliente {
         } catch (error) {
             console.error('Erro ao buscar clientes:', error);
             // Usar dados do cache como fallback
-            const resultados = clientesCache.filter(cliente => 
+            const resultados = clientesCache.filter(cliente =>
                 cliente.razao_social.toLowerCase().includes(termo.toLowerCase())
             );
             this.showDropdown(resultados, 'razao');
@@ -96,7 +96,7 @@ class AutocompleteCliente {
         if (cnpj.length >= 14) {
             try {
                 // Buscar primeiro no cache
-                let resultados = clientesCache.filter(cliente => 
+                let resultados = clientesCache.filter(cliente =>
                     cliente.cnpj.replace(/\D/g, '') === cnpj.replace(/\D/g, '')
                 );
 
@@ -156,7 +156,7 @@ class AutocompleteCliente {
                 cursor: pointer;
                 transition: background-color 0.2s;
             `;
-            
+
             item.innerHTML = `
                 <div style="font-weight: bold; color: #2c5aa0;">${resultado.cnpj}</div>
                 <div style="color: #333; margin-top: 4px;">${resultado.razao_social}</div>
@@ -189,7 +189,7 @@ class AutocompleteCliente {
     selectCliente(cliente) {
         document.getElementById('cnpj').value = cliente.cnpj;
         document.getElementById('razaoSocial').value = cliente.razao_social;
-        
+
         // Preencher nome fantasia se existir
         if (cliente.nome_fantasia) {
             const nomeFantasiaField = document.getElementById('nomeFantasia');
@@ -217,7 +217,7 @@ class AutocompleteCliente {
 
         try {
             // Validar no cache primeiro
-            const clienteCache = clientesCache.find(cliente => 
+            const clienteCache = clientesCache.find(cliente =>
                 cliente.cnpj.replace(/\D/g, '') === cnpj.replace(/\D/g, '') ||
                 cliente.razao_social.toLowerCase() === razao.toLowerCase()
             );
@@ -253,7 +253,7 @@ class AutocompleteCliente {
         products.forEach(product => {
             const metragInput = product.querySelector('input[name="metragem"]');
             const precoInput = product.querySelector('input[name="preco"]');
-            
+
             if (metragInput && precoInput) {
                 const metragem = parseFloat(metragInput.value) || 0;
                 const preco = parseFloat(precoInput.value) || 0;
@@ -270,7 +270,7 @@ class AutocompleteCliente {
         // Lógica de frete automático
         const tipoFreteSelect = document.querySelector('select[name="tipoFrete"]');
         const transportadoraCIF = document.getElementById('transportadoraCIF');
-        
+
         if (total > 5000) {
             if (tipoFreteSelect) {
                 tipoFreteSelect.value = 'CIF';
@@ -305,7 +305,7 @@ class AutocompleteCliente {
             margin: 8px 0;
             border-radius: 4px;
             font-size: 0.9em;
-            ${type === 'success' ? 
+            ${type === 'success' ?
                 'background: #d4edda; color: #155724; border: 1px solid #c3e6cb;' :
                 'background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;'
             }
@@ -418,11 +418,11 @@ function buscarPrecoAutomatico(id) {
     const produto = document.getElementById(`produto-${id}`);
     const artigo = produto.querySelector('[name="artigo"]').value.trim();
     const codigo = produto.querySelector('[name="codigo"]').value.trim();
-    
+
     if (!artigo && !codigo) return;
 
     // Buscar no cache de preços
-    const precoEncontrado = precosCache.find(preco => 
+    const precoEncontrado = precosCache.find(preco =>
         preco.artigo.toLowerCase().includes(artigo.toLowerCase()) ||
         preco.codigo.toLowerCase().includes(codigo.toLowerCase())
     );
@@ -446,11 +446,11 @@ function buscarPrecoAutomatico(id) {
         if (precoSugerido > 0) {
             const precoInput = produto.querySelector('[name="preco"]');
             precoInput.value = precoSugerido.toFixed(2);
-            
+
             const suggestionDiv = document.getElementById(`preco-sugerido-${id}`);
             suggestionDiv.innerHTML = `💡 Preço sugerido aplicado: R$ ${precoSugerido.toFixed(2)}`;
             suggestionDiv.style.color = '#28a745';
-            
+
             calcularSubtotal(id);
         }
     }
@@ -497,7 +497,7 @@ function initContadorCaracteres() {
             const contador = document.getElementById('contadorCaracteres');
             if (contador) {
                 contador.textContent = count;
-                
+
                 // Indicador visual para limite de caracteres
                 if (count > 500) {
                     contador.style.color = '#dc3545';
@@ -559,24 +559,24 @@ function initFormularioSubmit() {
             },
             body: JSON.stringify(dadosPedido)
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success || data.status === 'success') {
-                const numeroPedido = data.numero_pedido || data.pedido_numero || 'N/A';
-                alert(`✅ Pedido ${numeroPedido} enviado com sucesso!\n\n📧 Confirmação enviada por email!`);
-                limparFormulario();
-            } else {
-                alert(`❌ Erro: ${data.error || data.message || 'Erro desconhecido'}`);
-            }
-        })
-        .catch(error => {
-            console.error('Erro:', error);
-            alert('❌ Erro ao enviar pedido. Verifique sua conexão e tente novamente.');
-        })
-        .finally(() => {
-            btnSubmit.innerHTML = textoOriginal;
-            btnSubmit.disabled = false;
-        });
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.status === 'success') {
+                    const numeroPedido = data.numero_pedido || data.pedido_numero || 'N/A';
+                    alert(`✅ Pedido ${numeroPedido} enviado com sucesso!\n\n📧 Confirmação enviada por email!`);
+                    limparFormulario();
+                } else {
+                    alert(`❌ Erro: ${data.error || data.message || 'Erro desconhecido'}`);
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('❌ Erro ao enviar pedido. Verifique sua conexão e tente novamente.');
+            })
+            .finally(() => {
+                btnSubmit.innerHTML = textoOriginal;
+                btnSubmit.disabled = false;
+            });
     });
 }
 
@@ -654,7 +654,7 @@ function limparFormulario() {
     }
 
     contadorProdutos = 0;
-    
+
     // Adicionar primeiro produto novamente
     adicionarProduto();
 }
@@ -662,15 +662,15 @@ function limparFormulario() {
 // ========== INICIALIZAÇÃO PRINCIPAL ==========
 document.addEventListener('DOMContentLoaded', function () {
     console.log('🚀 Iniciando Designtex Pedidos - Versão Railway');
-    
+
     // Inicializar classes e componentes
     new AutocompleteCliente();
     initContadorCaracteres();
     initFormularioSubmit();
-    
+
     // Adicionar primeiro produto automaticamente
     adicionarProduto();
-    
+
     console.log('✅ Sistema inicializado com sucesso!');
 });
 
@@ -684,14 +684,205 @@ function formatarMoeda(valor) {
 
 function formatarCNPJ(cnpj) {
     return cnpj.replace(/\D/g, '')
-               .replace(/(\d{2})(\d)/, '$1.$2')
-               .replace(/(\d{3})(\d)/, '$1.$2')
-               .replace(/(\d{3})(\d)/, '$1/$2')
-               .replace(/(\d{4})(\d)/, '$1-$2');
+        .replace(/(\d{2})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1.$2')
+        .replace(/(\d{3})(\d)/, '$1/$2')
+        .replace(/(\d{4})(\d)/, '$1-$2');
 }
+
 
 // Exportar funções para uso global se necessário
 window.adicionarProduto = adicionarProduto;
 window.removerProduto = removerProduto;
 window.calcularSubtotal = calcularSubtotal;
 window.buscarPrecoAutomatico = buscarPrecoAutomatico;
+
+let contadorProdutos = 0;
+let listaArtigosComPrecos = [];
+let tipoPrecoAtual = ""; // Será "icms_7", "icms_12", "icms_18", "ret_mg" ou "ld"
+
+// Carrega artigos do banco e adiciona o primeiro produto depois que tudo chegou
+function carregarArtigosDoBanco(callback) {
+    fetch('/api/artigos_produto')
+        .then(res => res.json())
+        .then(dados => {
+            listaArtigosComPrecos = dados;
+            if (typeof callback === "function") callback();
+        });
+}
+
+// Pega valor de tabela preço selecionado pelo usuário
+function getTipoPrecoAtual() {
+    // Atualize de acordo com seu input radio!
+    const tabela = document.querySelector('input[name="tabelaPrecos"]:checked');
+    if (!tabela) return "";
+    const val = tabela.value;
+    if (val.includes("7%")) return "icms_7";
+    if (val.includes("12%")) return "icms_12";
+    if (val.includes("18%")) return "icms_18";
+    if (val.includes("RET")) return "ret_mg";
+    if (val.includes("LD")) return "ld";
+    return "";
+}
+
+// Ao mudar radio da tabela de preço, atualiza todos os selects e preços
+document.querySelectorAll('input[name="tabelaPrecos"]').forEach(radio => {
+    radio.addEventListener('change', function () {
+        tipoPrecoAtual = getTipoPrecoAtual();
+        atualizarTodosPrecosProdutos();
+    });
+});
+
+// Atualiza preços/códigos de todos produtos já adicionados
+function atualizarTodosPrecosProdutos() {
+    document.querySelectorAll('[id^="produto-"]').forEach(prodDiv => {
+        const pid = prodDiv.id.replace('produto-', '');
+        const artigoSelect = prodDiv.querySelector(`select.artigo-select[data-produto="${pid}"]`);
+        if (artigoSelect && artigoSelect.value) {
+            preencherCodigoEPreco(pid, artigoSelect.value);
+        }
+    });
+}
+
+// Gera o select de artigos (apenas da tabela certa)
+function gerarOpcoesArtigo() {
+    tipoPrecoAtual = getTipoPrecoAtual();
+    let arr = listaArtigosComPrecos.filter(a =>
+        (tipoPrecoAtual === 'ld') ? a.tabela === 'ld' : a.tabela === 'normal'
+    );
+    return arr;
+}
+
+function adicionarProduto() {
+    contadorProdutos++;
+    const container = document.getElementById('produtos-container');
+    const produtoDiv = document.createElement('div');
+    produtoDiv.className = 'border rounded p-3 mb-3';
+    produtoDiv.id = `produto-${contadorProdutos}`;
+
+    // Select vazio, opcoes via JS depois do append
+    produtoDiv.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Produto ${contadorProdutos}</h6>
+            <button type="button" class="btn btn-danger btn-sm" onclick="removerProduto(${contadorProdutos})">
+                🗑️ Remover
+            </button>
+        </div>
+        <div class="row">
+            <div class="col-md-3 mb-2">
+                <label class="form-label">Artigo *</label>
+                <select class="form-select artigo-select" data-produto="${contadorProdutos}" required>
+                    <option value="">Selecione...</option>
+                </select>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label class="form-label">Código</label>
+                <input type="text" class="form-control codigo-input" data-produto="${contadorProdutos}" readonly>
+            </div>
+            <div class="col-md-3 mb-2">
+                <label class="form-label">Desenho/Cor *</label>
+                <input type="text" class="form-control desenho-input" data-produto="${contadorProdutos}" required>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label class="form-label">Metragem *</label>
+                <input type="number" class="form-control metragem-input" data-produto="${contadorProdutos}" min="0.01" step="0.01" required>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label class="form-label">Preço Unitário</label>
+                <input type="number" class="form-control preco-input" data-produto="${contadorProdutos}" step="0.01" readonly>
+            </div>
+        </div>
+        <div class="text-end">
+            <strong>Subtotal: R$ <span class="subtotal" data-produto="${contadorProdutos}">0,00</span></strong>
+        </div>
+    `;
+    container.appendChild(produtoDiv);
+
+    // Popula select de artigo apenas com os da tabela correta
+    const artigoSelect = produtoDiv.querySelector(`select.artigo-select[data-produto="${contadorProdutos}"]`);
+    artigoSelect.innerHTML = `<option value="">Selecione...</option>`;
+    gerarOpcoesArtigo().forEach(({ artigo }) => {
+        const opt = document.createElement('option');
+        opt.value = artigo;
+        opt.textContent = artigo;
+        artigoSelect.appendChild(opt);
+    });
+
+    adicionarEventListenersProduto(contadorProdutos);
+}
+
+function removerProduto(id) {
+    const produto = document.getElementById(`produto-${id}`);
+    if (produto) {
+        produto.remove();
+        calcularTotal();
+    }
+}
+
+// Preenche código/preço ao selecionar artigo
+function adicionarEventListenersProduto(id) {
+    const artigoSelect = document.querySelector(`select.artigo-select[data-produto="${id}"]`);
+    artigoSelect.addEventListener('change', function () {
+        preencherCodigoEPreco(id, this.value);
+        calcularSubtotal(id);
+    });
+    const metragemInput = document.querySelector(`input.metragem-input[data-produto="${id}"]`);
+    metragemInput.addEventListener('input', function () {
+        calcularSubtotal(id);
+    });
+}
+
+function preencherCodigoEPreco(id, artigoSelecionado) {
+    // Busca artigo correto pela tabela ativa (normal/ld)
+    tipoPrecoAtual = getTipoPrecoAtual();
+    const artigoObj = listaArtigosComPrecos.find(a =>
+        a.artigo === artigoSelecionado && (
+            (tipoPrecoAtual === 'ld' && a.tabela === 'ld') ||
+            (tipoPrecoAtual !== 'ld' && a.tabela === 'normal')
+        )
+    );
+    const codigoInput = document.querySelector(`input.codigo-input[data-produto="${id}"]`);
+    const precoInput = document.querySelector(`input.preco-input[data-produto="${id}"]`);
+    if (artigoObj) {
+        codigoInput.value = artigoObj.codigo || '';
+        let preco = '';
+        if (tipoPrecoAtual === 'ld') {
+            preco = artigoObj.precos.ld ?? '';
+        } else {
+            preco = artigoObj.precos[tipoPrecoAtual] ?? '';
+        }
+        precoInput.value = preco !== null && preco !== '' ? parseFloat(preco).toFixed(2) : '';
+    } else {
+        codigoInput.value = '';
+        precoInput.value = '';
+    }
+    calcularSubtotal(id);
+}
+
+function calcularSubtotal(produtoId) {
+    const metragem = parseFloat(document.querySelector(`input.metragem-input[data-produto="${produtoId}"]`).value) || 0;
+    const preco = parseFloat(document.querySelector(`input.preco-input[data-produto="${produtoId}"]`).value) || 0;
+    const subtotal = metragem * preco;
+    document.querySelector(`span.subtotal[data-produto="${produtoId}"]`).textContent = subtotal.toFixed(2);
+    calcularTotal();
+}
+
+function calcularTotal() {
+    let total = 0;
+    document.querySelectorAll('.subtotal').forEach(span => {
+        total += parseFloat(span.textContent) || 0;
+    });
+    document.getElementById('valorTotal').textContent = total.toFixed(2);
+}
+
+// 1. Ao carregar página, busca artigos e adiciona primeiro produto
+window.addEventListener('load', function () {
+    carregarArtigosDoBanco(() => {
+        // se tiver radio já marcado, define tipoPrecoAtual, senão espera seleção
+        tipoPrecoAtual = getTipoPrecoAtual();
+        adicionarProduto();
+    });
+});
+
+
+

@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DESIGNTEX TECIDOS - PostgreSQL</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 600px;
+            width: 90%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        .status {
+            background: #e8f5e8;
+            color: #2d5f2d;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .btn {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            margin: 10px;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+        .btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-2px);
+        }
+        .btn.primary {
+            background: #28a745;
+            font-size: 1.2em;
+            padding: 15px 40px;
+        }
+        .btn.primary:hover {
+            background: #218838;
+        }
+        .info {
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: left;
+        }
+        .info h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        .endpoints {
+            list-style: none;
+            padding: 0;
+        }
+        .endpoints li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .endpoints li:last-child {
+            border-bottom: none;
+        }
+        .endpoints code {
+            background: #667eea;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="/static/logo-dtx.png" alt="Logo" class="logo-img">
+        <h1>🏭 DESIGNTEX TECIDOS</h1>
+        <p class="subtitle">Sistema de Pedidos - PostgreSQL</p>
+        
+        <div class="status">
+            ✅ Sistema Funcionando - Railway PostgreSQL
+        </div>
+        
+        <a href="/criar-pedido" class="btn primary">📋 CRIAR NOVO PEDIDO</a>
+        
+        <br><br>
+        
+        <a href="/health" class="btn">🔍 Health Check</a>
+        <a href="/clientes" class="btn">👥 Ver Clientes</a>
+        <a href="/precos" class="btn">💰 Ver Preços</a>
+        
+        <div class="info">
+            <h3>📋 Endpoints Disponíveis:</h3>
+            <ul class="endpoints">
+                <li><code>GET /criar-pedido</code> - Formulário de pedidos</li>
+                <li><code>POST /submit_pedido</code> - Enviar pedido</li>
+                <li><code>GET /health</code> - Status do sistema</li>
+                <li><code>GET /clientes</code> - Lista de clientes</li>
+                <li><code>GET /precos</code> - Tabela de preços</li>
+                <li><code>GET /api/buscar_clientes</code> - Buscar clientes</li>
+            </ul>
+        </div>
+        
+        <div class="info">
+            <h3>🔧 Para Power BI:</h3>
+            <p>Use esta URL como fonte de dados:</p>
+            <code style="background: #2d5f2d; color: white; padding: 8px; border-radius: 4px; display: block; margin-top: 10px;">
+                http://127.0.0.1:5001
+            </code>
+        </div>
+    </div>
+</body>
+</html>
+    ''')
+
+
+@app.route('/criar-pedido')
+def criar_pedido():
+    """Página para criar novo pedido"""
+
+    # Lista de prazos de pagamento
+    prazos = [
+        "À vista",
+        "7 dias",
+        "14 dias",
+        "21 dias",
+        "28 dias",
+        "21/28/35 dias",
+        "35/42/49 dias",
+        "28/35/42/49/56 dias",
+        "49/56/63 dias",
+        "42/49/56/63/70 dias",
+        "56/63/70/77/84 dias",
+        "28/56/84/112/140 dias",
+        "56/70/84/98/112 dias"
+    ]
+
+    return render_template_string('''
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solicitação de Pedido de Vendas - Designtex Tecidos</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- CSS customizado -->
+    <style>
+        body {
+            background-color: #80858b;
+            font-family: 'Arial', sans-serif;
+        }
+
+        .container {
+            background-color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px auto;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            max-width: 1000px;
+        }
+
+        .header-title {
+            color: #1a5490;
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        /* Autocomplete customizado */
+        .autocomplete-container {
+            position: relative;
+        }
+
+        .autocomplete-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-top: none;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+
+        .autocomplete-item {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .autocomplete-item:hover {
+            background-color: #f5f5f5;
+        }
+
+        .autocomplete-item:last-child {
+            border-bottom: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                padding: 20px;
+            }
+
+            .header-title {
+                font-size: 22px;
+            }
+        }
+
+        .btn-primary {
+            background-color: #1a5490;
+            border-color: #1a5490;
+        }
+
+        .btn-primary:hover {
+            background-color: #134072;
+            border-color: #134072;
+        }
+        
+        .btn-voltar {
+            background-color: #6c757d;
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+        
+        .btn-voltar:hover {
+            background-color: #5a6268;
+            color: white;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="/" class="btn-voltar">⬅️ Voltar ao Início</a>
+        
+        <h1 class="header-title">SOLICITAÇÃO DE PEDIDO DE VENDAS<br>DESIGNTEX TECIDOS</h1>
+
+        <form id="pedidoForm">
+            <!-- PARTE 1 - CABEÇALHO -->
+            <div class="card mb-4">
+                <div class="card-header" style="background-color: #1a5490; color: white;">
+                    <h5 class="mb-0">📋 DADOS DO CABEÇALHO</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="nomeRepresentante" class="form-label">Nome do Representante *</label>
+                            <input type="text" class="form-control" id="nomeRepresentante" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="razaoSocial" class="form-label">Razão Social do Cliente *</label>
+                            <div class="autocomplete-container">
+                                <input type="text" class="form-control" id="razaoSocial"
+                                    placeholder="Digite para buscar..." required>
+                                <div id="autocomplete-dropdown" class="autocomplete-dropdown"></div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="cnpj" class="form-label">CNPJ do Cliente *</label>
+                            <input type="text" class="form-control" id="cnpj" readonly
+                                style="background-color: #f8f9fa;">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="telefone" class="form-label">Telefone de Contato *</label>
+                            <input type="text" class="form-control" id="telefone" required>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PARTE 2 - CORPO DO PEDIDO -->
+            <div class="card mb-4">
+                <div class="card-header" style="background-color: #1a5490; color: white;">
+                    <h5 class="mb-0">⚙️ CONDIÇÕES DO PEDIDO</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="prazoPagamento" class="form-label">Prazo de Pagamento *</label>
+                            <select class="form-select" id="prazoPagamento" required>
+                                <option value="">Selecione...</option>
+                                ''' + ''.join([f'<option value="{prazo}">{prazo}</option>' for prazo in prazos]) + '''
+                            </select>
+                        </div>
+
+
+                    <div id="campoTriangulacao" class="mb-3" style="display:none;">
+                        <label for="dadosTriangulacao" class="form-label">Dados da Triangulação</label>
+                        <textarea class="form-control" id="dadosTriangulacao" rows="2"
+                            placeholder="Digite os dados da triangulação"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PARTE 3 - TABELA DE PREÇOS -->
+            <div class="card mb-4">
+    <div class="card-header" style="background-color: #1a5490; color: white;">
+        <h5 class="mb-0">💰 TABELA DE PREÇOS</h5>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <label class="form-label">Selecione a Tabela de Preços *</label>
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="border p-3 rounded">
+                        <div>
+                            <input type="radio" id="icms7" name="tabelaPrecos" value="ICMS 7%" required>
+                            <label for="icms7" class="form-check-label me-3">ICMS 7%</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="icms12" name="tabelaPrecos" value="ICMS 12%" required>
+                            <label for="icms12" class="form-check-label me-3">ICMS 12%</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="icms18" name="tabelaPrecos" value="ICMS 18%" required>
+                            <label for="icms18" class="form-check-label me-3">ICMS 18%</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="retmg" name="tabelaPrecos" value="RET (SOMENTE MG)" required>
+                            <label for="retmg" class="form-check-label me-3">RET (SOMENTE MG)</label>
+                        </div>
+                        <div>
+                            <input type="radio" id="precosld" name="tabelaPrecos" value="PREÇOS LD (GERAL)" required>
+                            <label for="precosld" class="form-check-label">PREÇOS LD (GERAL)</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-2">
+                <small class="text-muted">Selecione apenas uma opção.</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PARTE 4 - PRODUTOS -->
+<div class="card mb-4">
+    <div class="card-header" style="background-color: #1a5490; color: white;">
+        <h5 class="mb-0">📦 PRODUTOS</h5>
+    </div>
+    <div class="card-body">
+        <div id="produtos-container"></div>
+        <button type="button" class="btn btn-secondary mb-3" onclick="adicionarProduto()">
+            ➕ Adicionar Produto
+        </button>
+        <div class="text-end">
+            <h4>Total: R$ <span id="valorTotal">0,00</span></h4>
+        </div>
+    </div>
+</div>
+
+            <!-- PARTE 5 - OBSERVAÇÕES -->
+            <div class="card mb-4">
+                <div class="card-header" style="background-color: #1a5490; color: white;">
+                    <h5 class="mb-0">📝 OBSERVAÇÕES</h5>
+                </div>
+                <div class="card-body">
+                    <textarea class="form-control" id="observacoes" rows="4" maxlength="500"
+                        placeholder="Observações adicionais (máximo 500 caracteres)"></textarea>
+                    <div class="form-text">
+                        <span id="contadorCaracteres">0</span>/500 caracteres
+                    </div>
+                </div>
+            </div>
+
+            <!-- BOTÕES -->
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                <button type="submit" class="btn btn-primary btn-lg me-md-2">
+                    📤 Enviar Pedido
+                </button>
+                <button type="button" class="btn btn-secondary btn-lg" onclick="limparFormulario()">
+                    🗑️ Cancelar
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let contadorProdutos = 0;
+let listaArtigosComPrecos = [];
+let tipoPrecoAtual = "";
+
+// Carrega artigos do banco ao abrir
+function carregarArtigosDoBanco(callback) {
+    fetch('/api/artigos_produto')
+        .then(res => res.json())
+        .then(dados => {
+            listaArtigosComPrecos = dados;
+            if (typeof callback === "function") callback();
+        });
+}
+
+function getTipoPrecoAtual() {
+    const tabela = document.querySelector('input[name="tabelaPrecos"]:checked');
+    if (!tabela) return "";
+    const val = tabela.value;
+    if (val.includes("7%")) return "icms_7";
+    if (val.includes("12%")) return "icms_12";
+    if (val.includes("18%")) return "icms_18";
+    if (val.includes("RET")) return "ret_mg";
+    if (val.includes("LD")) return "ld";
+    return "";
+}
+
+// Quando mudar a tabela de preço, atualiza todos os selects/códigos/preços já carregados!
+document.querySelectorAll('input[name="tabelaPrecos"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        tipoPrecoAtual = getTipoPrecoAtual();
+        atualizarTodosPrecosProdutos();
+        atualizarTodasListasDeArtigos();
+    });
+});
+
+// Atualiza todos os produto já inseridos ao mudar radio
+function atualizarTodosPrecosProdutos() {
+    document.querySelectorAll('[id^="produto-"]').forEach(prodDiv => {
+        const pid = prodDiv.id.replace('produto-', '');
+        const artigoSelect = prodDiv.querySelector(`select.artigo-select[data-produto="${pid}"]`);
+        if (artigoSelect && artigoSelect.value) {
+            preencherCodigoEPreco(pid, artigoSelect.value);
+        }
+    });
+}
+function atualizarTodasListasDeArtigos() {
+    document.querySelectorAll('[id^="produto-"]').forEach(prodDiv => {
+        const pid = prodDiv.id.replace('produto-', '');
+        const artigoSelect = prodDiv.querySelector(`select.artigo-select[data-produto="${pid}"]`);
+        if (artigoSelect) {
+            let artigoAtual = artigoSelect.value;
+            artigoSelect.innerHTML = `<option value="">Selecione...</option>`;
+            let arr = gerarOpcoesArtigo();
+            arr.forEach(({ artigo }) => {
+                const opt = document.createElement("option");
+                opt.value = artigo;
+                opt.textContent = artigo;
+                artigoSelect.appendChild(opt);
+            });
+            // selecionar o artigo de antes se ainda estiver disponível
+            if (artigoAtual) artigoSelect.value = artigoAtual;
+        }
+    });
+}
+
+// Gera a lista certa (normal/ld)
+function gerarOpcoesArtigo() {
+    tipoPrecoAtual = getTipoPrecoAtual();
+    let arr = listaArtigosComPrecos.filter(a =>
+        (tipoPrecoAtual === 'ld') ? a.tabela === 'ld' : a.tabela === 'normal'
+    );
+    return arr;
+}
+
+function adicionarProduto() {
+    contadorProdutos++;
+    const container = document.getElementById('produtos-container');
+    const produtoDiv = document.createElement('div');
+    produtoDiv.className = 'border rounded p-3 mb-3';
+    produtoDiv.id = `produto-${contadorProdutos}`;
+
+    produtoDiv.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Produto ${contadorProdutos}</h6>
+            <button type="button" class="btn btn-danger btn-sm" onclick="removerProduto(${contadorProdutos})">
+                🗑️ Remover
+            </button>
+        </div>
+        <div class="row">
+            <div class="col-md-3 mb-2">
+                <label class="form-label">Artigo *</label>
+                <select class="form-select artigo-select" data-produto="${contadorProdutos}" required>
+                    <option value="">Selecione...</option>
+                </select>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label class="form-label">Código</label>
+                <input type="text" class="form-control codigo-input" data-produto="${contadorProdutos}" readonly>
+            </div>
+            <div class="col-md-3 mb-2">
+                <label class="form-label">Desenho/Cor *</label>
+                <input type="text" class="form-control desenho-input" data-produto="${contadorProdutos}" required>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label class="form-label">Metragem *</label>
+                <input type="number" class="form-control metragem-input" data-produto="${contadorProdutos}" min="0.01" step="0.01" required>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label class="form-label">Preço Unitário</label>
+                <input type="number" class="form-control preco-input" data-produto="${contadorProdutos}" step="0.01" readonly>
+            </div>
+        </div>
+        <div class="text-end">
+            <strong>Subtotal: R$ <span class="subtotal" data-produto="${contadorProdutos}">0,00</span></strong>
+        </div>
+    `;
+    container.appendChild(produtoDiv);
+
+    // Preenche os artigos conforme tabela selecionada
+    const artigoSelect = produtoDiv.querySelector(`select.artigo-select[data-produto="${contadorProdutos}"]`);
+    artigoSelect.innerHTML = `<option value="">Selecione...</option>`;
+    gerarOpcoesArtigo().forEach(({ artigo }) => {
+        const opt = document.createElement("option");
+        opt.value = artigo;
+        opt.textContent = artigo;
+        artigoSelect.appendChild(opt);
+    });
+
+    adicionarEventListenersProduto(contadorProdutos);
+}
+
+function removerProduto(id) {
+    const produto = document.getElementById(`produto-${id}`);
+    if (produto) {
+        produto.remove();
+        calcularTotal();
+    }
+}
+
+// Preenche código e preço ao mudar artigo
+function adicionarEventListenersProduto(id) {
+    const artigoSelect = document.querySelector(`select.artigo-select[data-produto="${id}"]`);
+    artigoSelect.addEventListener('change', function() {
+        preencherCodigoEPreco(id, this.value);
+        calcularSubtotal(id);
+    });
+    const metragemInput = document.querySelector(`input.metragem-input[data-produto="${id}"]`);
+    metragemInput.addEventListener('input', function() {
+        calcularSubtotal(id);
+    });
+}
+
+function preencherCodigoEPreco(id, artigoSelecionado) {
+    tipoPrecoAtual = getTipoPrecoAtual();
+    const artigoObj = listaArtigosComPrecos.find(a => 
+        a.artigo === artigoSelecionado && (
+           (tipoPrecoAtual === 'ld' && a.tabela === 'ld') ||
+           (tipoPrecoAtual !== 'ld' && a.tabela === 'normal')
+        )
+    );
+    const codigoInput = document.querySelector(`input.codigo-input[data-produto="${id}"]`);
+    const precoInput = document.querySelector(`input.preco-input[data-produto="${id}"]`);
+    if (artigoObj) {
+        codigoInput.value = artigoObj.codigo || '';
+        let preco = '';
+        if (tipoPrecoAtual === 'ld') {
+            preco = artigoObj.precos.ld ?? '';
+        } else {
+            preco = artigoObj.precos[tipoPrecoAtual] ?? '';
+        }
+        precoInput.value = preco !== null && preco !== '' ? parseFloat(preco).toFixed(2) : '';
+    } else {
+        codigoInput.value = '';
+        precoInput.value = '';
+    }
+    calcularSubtotal(id);
+}
+
+function calcularSubtotal(produtoId) {
+    const metragem = parseFloat(document.querySelector(`input.metragem-input[data-produto="${produtoId}"]`).value) || 0;
+    const preco = parseFloat(document.querySelector(`input.preco-input[data-produto="${produtoId}"]`).value) || 0;
+    const subtotal = metragem * preco;
+    document.querySelector(`span.subtotal[data-produto="${produtoId}"]`).textContent = subtotal.toFixed(2);
+    calcularTotal();
+}
+
+function calcularTotal() {
+    let total = 0;
+    document.querySelectorAll('.subtotal').forEach(span => {
+        total += parseFloat(span.textContent) || 0;
+    });
+    document.getElementById('valorTotal').textContent = total.toFixed(2);
+}
+
+window.addEventListener('load', function() {
+    carregarArtigosDoBanco(() => {
+        tipoPrecoAtual = getTipoPrecoAtual();
+        adicionarProduto();
+    });
+});
+</script>
+
+    <script>
+        let contadorProdutos = 0;
+        let timeoutId;
+
+        // ========== AUTOCOMPLETE DE CLIENTES ==========
+        document.getElementById('razaoSocial').addEventListener('input', function (e) {
+            const query = e.target.value.trim();
+            const dropdown = document.getElementById('autocomplete-dropdown');
+
+            clearTimeout(timeoutId);
+
+            if (query.length < 1) {
+                dropdown.style.display = 'none';
+                limparDadosCliente();
+                return;
+            }
+
+            timeoutId = setTimeout(() => {
+                buscarClientes(query);
+            }, 300);
+        });
+
+        function buscarClientes(query) {
+            fetch(`/api/buscar_clientes?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    mostrarResultados(data);
+                })
+                .catch(error => {
+                    console.error('Erro na busca:', error);
+                });
+        }
+
+        function mostrarResultados(clientes) {
+            const dropdown = document.getElementById('autocomplete-dropdown');
+            dropdown.innerHTML = '';
+
+            if (clientes.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            clientes.forEach(cliente => {
+                const item = document.createElement('div');
+                item.className = 'autocomplete-item';
+                item.innerHTML = `
+                    <strong>${cliente.razao_social}</strong><br>
+                    <small style="color: #666;">CNPJ: ${cliente.cnpj}</small>
+                `;
+
+                item.addEventListener('click', () => {
+                    selecionarCliente(cliente);
+                });
+
+                dropdown.appendChild(item);
+            });
+
+            dropdown.style.display = 'block';
+        }
+
+        function selecionarCliente(cliente) {
+            document.getElementById('razaoSocial').value = cliente.razao_social;
+            document.getElementById('cnpj').value = cliente.cnpj;
+            document.getElementById('telefone').value = cliente.telefone || '';
+            
+            document.getElementById('autocomplete-dropdown').style.display = 'none';
+        }
+
+        function limparDadosCliente() {
+            document.getElementById('cnpj').value = '';
+            document.getElementById('telefone').value = '';
+        }
+
+        // Fechar dropdown ao clicar fora
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('.autocomplete-container')) {
+                document.getElementById('autocomplete-dropdown').style.display = 'none';
+            }
+        });
+
+        // ========== CAMPOS CONDICIONAIS ==========
+        
+        // Tipo de Pedido - mostrar campo OP
+        document.getElementById('tipoPedido').addEventListener('change', function () {
+            const campoOP = document.getElementById('campoNumeroOP');
+            const numeroOP = document.getElementById('numeroOP');
+            
+            if (this.value === 'OP') {
+                campoOP.style.display = 'block';
+                numeroOP.required = true;
+            } else {
+                campoOP.style.display = 'none';
+                numeroOP.required = false;
+                numeroOP.value = '';
+            }
+        });
+
+        // Tipo de Frete - mostrar campos transportadora
+        document.getElementById('tipoFrete').addEventListener('change', function () {
+            const campoFOB = document.getElementById('campoTransportadoraFOB');
+            const campoCIF = document.getElementById('campoTransportadoraCIF');
+            
+            campoFOB.style.display = 'none';
+            campoCIF.style.display = 'none';
+            
+            if (this.value === 'FOB') {
+                campoFOB.style.display = 'block';
+            } else if (this.value === 'CIF') {
+                campoCIF.style.display = 'block';
+            }
+        });
+
+        // Venda Triangular - mostrar campo dados
+        document.getElementById('vendaTriangular').addEventListener('change', function () {
+            const campoTriangulacao = document.getElementById('campoTriangulacao');
+            
+            if (this.value === 'Sim') {
+                campoTriangulacao.style.display = 'block';
+            } else {
+                campoTriangulacao.style.display = 'none';
+            }
+        });
+
+        // ========== PRODUTOS ==========
+        function adicionarProduto() {
+            contadorProdutos++;
+            
+            const container = document.getElementById('produtos-container');
+            
+            const produtoDiv = document.createElement('div');
+            produtoDiv.className = 'border rounded p-3 mb-3';
+            produtoDiv.id = `produto-${contadorProdutos}`;
+            
+            produtoDiv.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">Produto ${contadorProdutos}</h6>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="removerProduto(${contadorProdutos})">
+                        🗑️ Remover
+                    </button>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Artigo *</label>
+                        <select class="form-select artigo-select" data-produto="${contadorProdutos}" required>
+                            <option value="">Selecione...</option>
+                           
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-2 mb-2">
+                        <label class="form-label">Código</label>
+                        <input type="text" class="form-control codigo-input" data-produto="${contadorProdutos}" readonly>
+                    </div>
+                    
+                    <div class="col-md-3 mb-2">
+                        <label class="form-label">Desenho/Cor *</label>
+                        <input type="text" class="form-control desenho-input" data-produto="${contadorProdutos}" required>
+                    </div>
+                    
+                    <div class="col-md-2 mb-2">
+                        <label class="form-label">Metragem *</label>
+                        <input type="number" class="form-control metragem-input" data-produto="${contadorProdutos}" 
+                               min="0.01" step="0.01" required>
+                    </div>
+                    
+                    <div class="col-md-2 mb-2">
+                        <label class="form-label">Preço Unitário</label>
+                        <input type="number" class="form-control preco-input" data-produto="${contadorProdutos}" 
+                               step="0.01" readonly>
+                    </div>
+                </div>
+                
+                <div class="text-end">
+                    <strong>Subtotal: R$ <span class="subtotal" data-produto="${contadorProdutos}">0,00</span></strong>
+                </div>
+            `;
+            
+            container.appendChild(produtoDiv);
+            
+            // Adicionar event listeners
+            adicionarEventListenersProduto(contadorProdutos);
+        }
+
+        function removerProduto(id) {
+            const produto = document.getElementById(`produto-${id}`);
+            if (produto) {
+                produto.remove();
+                calcularTotal();
+            }
+        }
+
+        function adicionarEventListenersProduto(id) {
+            // Artigo change
+            const artigoSelect = document.querySelector(`select[data-produto="${id}"]`);
+            artigoSelect.addEventListener('change', function() {
+                atualizarPrecoProduto(id, this.value);
+            });
+            
+            // Metragem change
+            const metragemInput = document.querySelector(`input.metragem-input[data-produto="${id}"]`);
+            metragemInput.addEventListener('input', function() {
+                calcularSubtotal(id);
+            });
+        }
+
+                    
+            const codigoInput = document.querySelector(`input.codigo-input[data-produto="${produtoId}"]`);
+            const precoInput = document.querySelector(`input.preco-input[data-produto="${produtoId}"]`);
+            
+            if (precos[artigo]) {
+                codigoInput.value = precos[artigo].codigo;
+                precoInput.value = precos[artigo].preco.toFixed(2);
+                calcularSubtotal(produtoId);
+            } else {
+                codigoInput.value = '';
+                precoInput.value = '';
+                calcularSubtotal(produtoId);
+            }
+        }
+
+        function calcularSubtotal(produtoId) {
+            const metragem = parseFloat(document.querySelector(`input.metragem-input[data-produto="${produtoId}"]`).value) || 0;
+            const preco = parseFloat(document.querySelector(`input.preco-input[data-produto="${produtoId}"]`).value) || 0;
+            const subtotal = metragem * preco;
+            
+            document.querySelector(`span.subtotal[data-produto="${produtoId}"]`).textContent = subtotal.toFixed(2);
+            calcularTotal();
+        }
+
+        function calcularTotal() {
+            let total = 0;
+            document.querySelectorAll('.subtotal').forEach(span => {
+                total += parseFloat(span.textContent) || 0;
+            });
+            document.getElementById('valorTotal').textContent = total.toFixed(2);
+        }
+
+        // Contador de caracteres
+        document.getElementById('observacoes').addEventListener('input', function() {
+            document.getElementById('contadorCaracteres').textContent = this.value.length;
+        });
+
+        function limparFormulario() {
+            if (confirm('Deseja realmente cancelar e limpar todos os dados?')) {
+                document.getElementById('pedidoForm').reset();
+                document.getElementById('produtos-container').innerHTML = '';
+                contadorProdutos = 0;
+                calcularTotal();
+            }
+        }
+
+        // Submit do formulário
+        document.getElementById('pedidoForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Validar se há produtos
+            if (contadorProdutos === 0) {
+                alert('Adicione pelo menos um produto ao pedido!');
+                return;
+            }
+            
+            // Coletar dados do formulário
+            const dadosPedido = {
+                nomeRepresentante: document.getElementById('nomeRepresentante').value,
+                razaoSocial: document.getElementById('razaoSocial').value,
+                cnpj: document.getElementById('cnpj').value,
+                telefone: document.getElementById('telefone').value,
+                prazoPagamento: document.getElementById('prazoPagamento').value,
+                tipoPedido: document.getElementById('tipoPedido').value,
+                numeroOP: document.getElementById('numeroOP').value,
+                tipoFrete: document.getElementById('tipoFrete').value,
+                tipoProduto: document.getElementById('tipoProduto').value,
+                vendaTriangular: document.getElementById('vendaTriangular').value,
+                regimeRET: document.getElementById('regimeRET').value,
+                tabelaPrecos: document.querySelector('input[name="tabelaPrecos"]:checked')?.value,
+                observacoes: document.getElementById('observacoes').value,
+                produtos: [],
+                valorTotal: parseFloat(document.getElementById('valorTotal').textContent)
+            };
+            
+            // Coletar produtos
+            document.querySelectorAll('[id^="produto-"]').forEach(produtoDiv => {
+                const produtoId = produtoDiv.id.replace('produto-', '');
+                const produto = {
+                    artigo: produtoDiv.querySelector(`select[data-produto="${produtoId}"]`).value,
+                    codigo: produtoDiv.querySelector(`input.codigo-input[data-produto="${produtoId}"]`).value,
+                    desenho_cor: produtoDiv.querySelector(`input.desenho-input[data-produto="${produtoId}"]`).value,
+                    metragem: parseFloat(produtoDiv.querySelector(`input.metragem-input[data-produto="${produtoId}"]`).value),
+                    preco: parseFloat(produtoDiv.querySelector(`input.preco-input[data-produto="${produtoId}"]`).value),
+                    subtotal: parseFloat(produtoDiv.querySelector(`span.subtotal[data-produto="${produtoId}"]`).textContent)
+                };
+                dadosPedido.produtos.push(produto);
+            });
+            
+            // Enviar pedido
+            fetch('/submit_pedido', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(dadosPedido)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.sucesso) {
+                    alert(`Pedido enviado com sucesso! Número: ${data.numero_pedido}`);
+                    limparFormulario();
+                } else {
+                    alert(`Erro ao enviar pedido: ${data.erro}`);
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao enviar pedido. Tente novamente.');
+            });
+        });
+
+        // Adicionar primeiro produto automaticamente
+        window.addEventListener('load', function() {
+            adicionarProduto();
+        });
+
+let contadorProdutos = 0;
+let listaArtigosComPrecos = [];
+let tipoPrecoAtual = ""; // Será "icms_7", "icms_12", "icms_18", "ret_mg" ou "ld"
+
+// Carrega artigos do banco e adiciona o primeiro produto depois que tudo chegou
+function carregarArtigosDoBanco(callback) {
+    fetch('/api/artigos_produto')
+        .then(res => res.json())
+        .then(dados => {
+            listaArtigosComPrecos = dados;
+            if (typeof callback === "function") callback();
+        });
+}
+
+// Pega valor de tabela preço selecionado pelo usuário
+function getTipoPrecoAtual() {
+    // Atualize de acordo com seu input radio!
+    const tabela = document.querySelector('input[name="tabelaPrecos"]:checked');
+    if (!tabela) return "";
+    const val = tabela.value;
+    if (val.includes("7%")) return "icms_7";
+    if (val.includes("12%")) return "icms_12";
+    if (val.includes("18%")) return "icms_18";
+    if (val.includes("RET")) return "ret_mg";
+    if (val.includes("LD")) return "ld";
+    return "";
+}
+
+// Ao mudar radio da tabela de preço, atualiza todos os selects e preços
+document.querySelectorAll('input[name="tabelaPrecos"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        tipoPrecoAtual = getTipoPrecoAtual();
+        atualizarTodosPrecosProdutos();
+    });
+});
+
+// Atualiza preços/códigos de todos produtos já adicionados
+function atualizarTodosPrecosProdutos() {
+    document.querySelectorAll('[id^="produto-"]').forEach(prodDiv => {
+        const pid = prodDiv.id.replace('produto-', '');
+        const artigoSelect = prodDiv.querySelector(`select.artigo-select[data-produto="${pid}"]`);
+        if (artigoSelect && artigoSelect.value) {
+            preencherCodigoEPreco(pid, artigoSelect.value);
+        }
+    });
+}
+
+// Gera o select de artigos (apenas da tabela certa)
+function gerarOpcoesArtigo() {
+    tipoPrecoAtual = getTipoPrecoAtual();
+    let arr = listaArtigosComPrecos.filter(a =>
+        (tipoPrecoAtual === 'ld') ? a.tabela === 'ld' : a.tabela === 'normal'
+    );
+    return arr;
+}
+
+function adicionarProduto() {
+    contadorProdutos++;
+    const container = document.getElementById('produtos-container');
+    const produtoDiv = document.createElement('div');
+    produtoDiv.className = 'border rounded p-3 mb-3';
+    produtoDiv.id = `produto-${contadorProdutos}`;
+
+    // Select vazio, opcoes via JS depois do append
+    produtoDiv.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Produto ${contadorProdutos}</h6>
+            <button type="button" class="btn btn-danger btn-sm" onclick="removerProduto(${contadorProdutos})">
+                🗑️ Remover
+            </button>
+        </div>
+        <div class="row">
+            <div class="col-md-3 mb-2">
+                <label class="form-label">Artigo *</label>
+                <select class="form-select artigo-select" data-produto="${contadorProdutos}" required>
+                    <option value="">Selecione...</option>
+                </select>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label class="form-label">Código</label>
+                <input type="text" class="form-control codigo-input" data-produto="${contadorProdutos}" readonly>
+            </div>
+            <div class="col-md-3 mb-2">
+                <label class="form-label">Desenho/Cor *</label>
+                <input type="text" class="form-control desenho-input" data-produto="${contadorProdutos}" required>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label class="form-label">Metragem *</label>
+                <input type="number" class="form-control metragem-input" data-produto="${contadorProdutos}" min="0.01" step="0.01" required>
+            </div>
+            <div class="col-md-2 mb-2">
+                <label class="form-label">Preço Unitário</label>
+                <input type="number" class="form-control preco-input" data-produto="${contadorProdutos}" step="0.01" readonly>
+            </div>
+        </div>
+        <div class="text-end">
+            <strong>Subtotal: R$ <span class="subtotal" data-produto="${contadorProdutos}">0,00</span></strong>
+        </div>
+    `;
+    container.appendChild(produtoDiv);
+
+    // Popula select de artigo apenas com os da tabela correta
+    const artigoSelect = produtoDiv.querySelector(`select.artigo-select[data-produto="${contadorProdutos}"]`);
+    artigoSelect.innerHTML = `<option value="">Selecione...</option>`;
+    gerarOpcoesArtigo().forEach(({ artigo }) => {
+        const opt = document.createElement('option');
+        opt.value = artigo;
+        opt.textContent = artigo;
+        artigoSelect.appendChild(opt);
+    });
+
+    adicionarEventListenersProduto(contadorProdutos);
+}
+
+function removerProduto(id) {
+    const produto = document.getElementById(`produto-${id}`);
+    if (produto) {
+        produto.remove();
+        calcularTotal();
+    }
+}
+
+// Preenche código/preço ao selecionar artigo
+function adicionarEventListenersProduto(id) {
+    const artigoSelect = document.querySelector(`select.artigo-select[data-produto="${id}"]`);
+    artigoSelect.addEventListener('change', function() {
+        preencherCodigoEPreco(id, this.value);
+        calcularSubtotal(id);
+    });
+    const metragemInput = document.querySelector(`input.metragem-input[data-produto="${id}"]`);
+    metragemInput.addEventListener('input', function() {
+        calcularSubtotal(id);
+    });
+}
+
+function preencherCodigoEPreco(id, artigoSelecionado) {
+    // Busca artigo correto pela tabela ativa (normal/ld)
+    tipoPrecoAtual = getTipoPrecoAtual();
+    const artigoObj = listaArtigosComPrecos.find(a => 
+        a.artigo === artigoSelecionado && (
+           (tipoPrecoAtual === 'ld' && a.tabela === 'ld') ||
+           (tipoPrecoAtual !== 'ld' && a.tabela === 'normal')
+        )
+    );
+    const codigoInput = document.querySelector(`input.codigo-input[data-produto="${id}"]`);
+    const precoInput = document.querySelector(`input.preco-input[data-produto="${id}"]`);
+    if (artigoObj) {
+        codigoInput.value = artigoObj.codigo || '';
+        let preco = '';
+        if (tipoPrecoAtual === 'ld') {
+            preco = artigoObj.precos.ld ?? '';
+        } else {
+            preco = artigoObj.precos[tipoPrecoAtual] ?? '';
+        }
+        precoInput.value = preco !== null && preco !== '' ? parseFloat(preco).toFixed(2) : '';
+    } else {
+        codigoInput.value = '';
+        precoInput.value = '';
+    }
+    calcularSubtotal(id);
+}
+
+function calcularSubtotal(produtoId) {
+    const metragem = parseFloat(document.querySelector(`input.metragem-input[data-produto="${produtoId}"]`).value) || 0;
+    const preco = parseFloat(document.querySelector(`input.preco-input[data-produto="${produtoId}"]`).value) || 0;
+    const subtotal = metragem * preco;
+    document.querySelector(`span.subtotal[data-produto="${produtoId}"]`).textContent = subtotal.toFixed(2);
+    calcularTotal();
+}
+
+function calcularTotal() {
+    let total = 0;
+    document.querySelectorAll('.subtotal').forEach(span => {
+        total += parseFloat(span.textContent) || 0;
+    });
+    document.getElementById('valorTotal').textContent = total.toFixed(2);
+}
+
+// 1. Ao carregar página, busca artigos e adiciona primeiro produto
+window.addEventListener('load', function() {
+    carregarArtigosDoBanco(() => {
+        // se tiver radio já marcado, define tipoPrecoAtual, senão espera seleção
+        tipoPrecoAtual = getTipoPrecoAtual();
+        adicionarProduto();
+    });
+});
+
+    </script>
+
+
+</body>
+
+
+</html>
