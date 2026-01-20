@@ -54,9 +54,9 @@ configurar_encoding()
 
 RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
 EMAIL_DESTINOS = os.getenv(
-    'EMAIL_TO', 'pedido@designtextecidos.com.br,design2@designtextecidos.com.br').split(',')
+    'EMAIL_TO', 'design.designtextecidos@gmail.com').split(',')
 # Ou seu domínio verificado
-EMAIL_FROM = os.getenv('EMAIL_FROM', 'pedido@designtextecidos.com.br')
+EMAIL_FROM = os.getenv('EMAIL_FROM', 'onboarding@resend.dev')
 
 
 def enviar_email_pedido_completo(dados_pedido, numero_pedido, pdf_buffer):
