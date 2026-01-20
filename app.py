@@ -535,7 +535,7 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
             ('Número OP:', dados_pedido.get('numeroOP')),
             ('Tipo Produto:', dados_pedido.get('tipoProduto')),
         ]
-        
+
         # Coluna 2 (direita)
         campos_col2 = [
             ('Tipo Frete:', dados_pedido.get('tipoFrete')),
@@ -545,18 +545,20 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
             ('Transportadora CIF:', dados_pedido.get('transportadoraCIF')),
             ('Dados Triangulação:', dados_pedido.get('dadosTriangulacao')),
         ]
-        
+
         # Filtra campos preenchidos
-        col1_data = [[r, str(v) if v else ''] for r, v in campos_col1 if v not in (None, '', [])]
-        col2_data = [[r, str(v) if v else ''] for r, v in campos_col2 if v not in (None, '', [])]
-        
+        col1_data = [[r, str(v) if v else '']
+                     for r, v in campos_col1 if v not in (None, '', [])]
+        col2_data = [[r, str(v) if v else '']
+                     for r, v in campos_col2 if v not in (None, '', [])]
+
         # Iguala número de linhas
         max_rows = max(len(col1_data), len(col2_data))
         while len(col1_data) < max_rows:
             col1_data.append(['', ''])
         while len(col2_data) < max_rows:
             col2_data.append(['', ''])
-        
+
         # Monta tabela de condições em 2 colunas
         condicoes_header = [['CONDIÇÕES DO PEDIDO', '', '', '']]
         condicoes_rows = []
@@ -566,10 +568,11 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
                 col2_data[i][0], col2_data[i][1]
             ]
             condicoes_rows.append(row)
-        
+
         condicoes_data = condicoes_header + condicoes_rows
-        
-        condicoes_table = Table(condicoes_data, colWidths=[3.5*cm, 4.5*cm, 3.5*cm, 4.5*cm])
+
+        condicoes_table = Table(condicoes_data, colWidths=[
+                                3.5*cm, 4.5*cm, 3.5*cm, 4.5*cm])
         condicoes_table.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -582,8 +585,10 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BACKGROUND', (0, 1), (-1, -1), colors.white),  # ✅ FUNDO BRANCO
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),  # Labels col1 em negrito
-            ('FONTNAME', (2, 1), (2, -1), 'Helvetica-Bold'),  # Labels col2 em negrito
+            # Labels col1 em negrito
+            ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),
+            # Labels col2 em negrito
+            ('FONTNAME', (2, 1), (2, -1), 'Helvetica-Bold'),
         ]))
         story.append(condicoes_table)
         story.append(Spacer(1, 12))
@@ -642,6 +647,7 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
     except Exception as e:
         print(f"Erro ao gerar PDF: {e}")
         return None
+
 
 # -----------------------------------------------------------------------------
 # Flask app
@@ -1320,19 +1326,8 @@ document.getElementById('pedidoForm').addEventListener('submit', function(e) {
     .then(r => r.json())
     .then(data => {
         if (data.sucesso) {
-            // ✅ Pergunta se quer baixar o PDF
-            const baixarPdf = confirm(
-                `✅ Pedido enviado com sucesso!\n\n` +
-                `Número: ${data.numero_pedido}\n\n` +
-                `Deseja baixar uma cópia do pedido em PDF?`
-            );
-            
-            if (baixarPdf) {
-                // Abre o download do PDF
-                window.open(`/baixar-pedido/${data.numero_pedido}`, '_blank');
-            }
-            
-            limparFormulario();
+            // ✅ Mostra modal com opções (funciona melhor no iOS)
+            mostrarModalSucesso(data.numero_pedido);
         } else {
             alert(`Erro ao enviar pedido: ${data.erro}`);
         }
@@ -1342,6 +1337,79 @@ document.getElementById('pedidoForm').addEventListener('submit', function(e) {
         alert('Erro ao enviar pedido. Tente novamente.');
     });
 });
+
+// ✅ Modal de sucesso com botão para baixar PDF
+function mostrarModalSucesso(numeroPedido) {
+    // Remove modal anterior se existir
+    const modalAnterior = document.getElementById('modalSucesso');
+    if (modalAnterior) modalAnterior.remove();
+    
+    const modalHtml = `
+        <div id="modalSucesso" style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        ">
+            <div style="
+                background: white;
+                padding: 30px;
+                border-radius: 15px;
+                text-align: center;
+                max-width: 90%;
+                width: 400px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            ">
+                <div style="font-size: 60px; margin-bottom: 15px;">✅</div>
+                <h3 style="color: #1a5490; margin-bottom: 10px;">Pedido Enviado!</h3>
+                <p style="font-size: 18px; margin-bottom: 20px;">
+                    Número: <strong>#${numeroPedido}</strong>
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <a href="/baixar-pedido/${numeroPedido}" 
+                       target="_blank"
+                       style="
+                           background: #1a5490;
+                           color: white;
+                           padding: 12px 20px;
+                           border-radius: 8px;
+                           text-decoration: none;
+                           font-weight: bold;
+                           display: block;
+                       ">
+                        📄 Baixar/Visualizar PDF
+                    </a>
+                    <button onclick="fecharModalELimpar()" style="
+                        background: #6c757d;
+                        color: white;
+                        padding: 12px 20px;
+                        border-radius: 8px;
+                        border: none;
+                        font-weight: bold;
+                        cursor: pointer;
+                    ">
+                        ✓ Fechar e Novo Pedido
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function fecharModalELimpar() {
+    const modal = document.getElementById('modalSucesso');
+    if (modal) modal.remove();
+    limparFormulario();
+}
+
 
 
 // ============================= INICIALIZAÇÃO =============================
