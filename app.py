@@ -1,3 +1,4 @@
+import resend
 import click
 from threading import Lock
 import os
@@ -14,11 +15,6 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.lib.units import mm, cm
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -54,76 +50,92 @@ def configurar_encoding():
 
 configurar_encoding()
 
-# -----------------------------------------------------------------------------
-# Email (use variáveis de ambiente em produção)
-# -----------------------------------------------------------------------------
-EMAIL_HOST = os.getenv('SMTP_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.getenv('SMTP_PORT', 587))
-EMAIL_USER = os.getenv('EMAIL_USER', '')
-EMAIL_PASS = os.getenv('EMAIL_PASSWORD', '')
+# Email via Resend API (funciona no Railway)
+
+RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
 EMAIL_DESTINOS = os.getenv(
     'EMAIL_TO', 'pedido@designtextecidos.com.br,design2@designtextecidos.com.br').split(',')
+# Ou seu domínio verificado
+EMAIL_FROM = os.getenv('EMAIL_FROM', 'onboarding@resend.dev')
 
 
 def enviar_email_pedido_completo(dados_pedido, numero_pedido, pdf_buffer):
+    """Envia email com PDF anexo usando Resend API"""
     try:
-        if not EMAIL_USER or not EMAIL_PASS:
-            print("⚠️ EMAIL_USER/EMAIL_PASSWORD não configurados. Pulando envio.")
+        if not RESEND_API_KEY:
+            print("⚠️ RESEND_API_KEY não configurada. Pulando envio de email.")
             return False
 
-        msg = MIMEMultipart()
-        msg['From'] = EMAIL_USER
-        msg['To'] = ', '.join(EMAIL_DESTINOS)
-        msg['Subject'] = f"🏭 NOVO PEDIDO DTX #{numero_pedido} - {dados_pedido.get('razaoSocial', '')[:30]}"
+        resend.api_key = RESEND_API_KEY
 
+        # Preparar corpo HTML
         corpo_html = f"""
         <html><body style="font-family: Arial, sans-serif; line-height:1.6; color:#333;">
-            <div style="background:#1a5490;color:white;padding:10px;text-align:center;">
-                <h1>🏭 DESIGNTEX TECIDOS</h1>
-                <h2>NOVA SOLICITAÇÃO DE PEDIDO DE VENDAS</h2>
+            <div style="background:#1a5490;color:white;padding:20px;text-align:center;">
+                <h1 style="margin:0;">🏭 DESIGNTEX TECIDOS</h1>
+                <h2 style="margin:10px 0 0 0;">NOVA SOLICITAÇÃO DE PEDIDO DE VENDAS</h2>
             </div>
-            <div style="padding:10px;">
+            <div style="padding:20px;">
                 <h3 style="color:#1a5490;">📋 DADOS DO PEDIDO</h3>
-                <table style="width:100%;border-collapse:collapse;margin-bottom:10px;">
-                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">Número:</td>
-                        <td style="padding:8px;border:1px solid #ddd;">#{numero_pedido}</td></tr>
-                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">Representante:</td>
-                        <td style="padding:8px;border:1px solid #ddd;">{dados_pedido.get('nomeRepresentante', '')}</td></tr>
-                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">Cliente:</td>
-                        <td style="padding:8px;border:1px solid #ddd;">{dados_pedido.get('razaoSocial', '')}</td></tr>
-                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">CNPJ:</td>
-                        <td style="padding:8px;border:1px solid #ddd;">{dados_pedido.get('cnpj', '')}</td></tr>
-                    <tr><td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">Valor Total:</td>
-                        <td style="padding:8px;border:1px solid #ddd;"><strong>R$ {dados_pedido.get('valorTotal', 0):.2f}</strong></td></tr>
+                <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+                    <tr>
+                        <td style="padding:12px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;width:150px;">Número:</td>
+                        <td style="padding:12px;border:1px solid #ddd;"><strong>#{numero_pedido}</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:12px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">Representante:</td>
+                        <td style="padding:12px;border:1px solid #ddd;">{dados_pedido.get('nomeRepresentante', '')}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:12px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">Cliente:</td>
+                        <td style="padding:12px;border:1px solid #ddd;">{dados_pedido.get('razaoSocial', '')}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:12px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">CNPJ:</td>
+                        <td style="padding:12px;border:1px solid #ddd;">{dados_pedido.get('cnpj', '')}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:12px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">Valor Total:</td>
+                        <td style="padding:12px;border:1px solid #ddd;"><strong style="color:#1a5490;font-size:18px;">R$ {dados_pedido.get('valorTotal', 0):.2f}</strong></td>
+                    </tr>
                 </table>
-                <div style="text-align:center;margin-top:15px;padding:10px;background:#1a5490;color:white;">
+                <div style="text-align:center;margin-top:20px;padding:15px;background:#1a5490;color:white;border-radius:5px;">
                     <p style="margin:0;"><strong>Sistema de Pedidos DESIGNTEX TECIDOS</strong></p>
-                    <p style="margin:5px 0;font-size:12px;">Recebido em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</p>
+                    <p style="margin:5px 0 0 0;font-size:12px;">Recebido em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</p>
                 </div>
             </div>
         </body></html>
         """
-        msg.attach(MIMEText(corpo_html, 'html'))
 
+        # Preparar anexo PDF
+        attachments = []
         if pdf_buffer and pdf_buffer.getvalue():
             pdf_buffer.seek(0)
-            part = MIMEBase('application', 'pdf')
-            part.set_payload(pdf_buffer.read())
-            encoders.encode_base64(part)
-            nome_arquivo = f"Pedido_DTX_{numero_pedido}_{dados_pedido.get('razaoSocial', '').replace(' ', '_').replace('/', '_')[:20]}.pdf"
-            part.add_header('Content-Disposition',
-                            f'attachment; filename="{nome_arquivo}"')
-            msg.attach(part)
+            nome_arquivo = f"Pedido_DTX_{numero_pedido}.pdf"
+            attachments.append({
+                "filename": nome_arquivo,
+                # Resend espera lista de bytes
+                "content": list(pdf_buffer.read()),
+            })
 
-        server = smtplib.SMTP(EMAIL_HOST, EMAIL_PORT)
-        server.starttls()
-        server.login(EMAIL_USER, EMAIL_PASS)
-        server.sendmail(EMAIL_USER, EMAIL_DESTINOS, msg.as_string())
-        server.quit()
-        print("✅ Email enviado")
+        # Enviar email
+        params = {
+            "from": EMAIL_FROM,
+            "to": EMAIL_DESTINOS,
+            "subject": f"🏭 NOVO PEDIDO DTX #{numero_pedido} - {dados_pedido.get('razaoSocial', '')[:30]}",
+            "html": corpo_html,
+        }
+
+        if attachments:
+            params["attachments"] = attachments
+
+        response = resend.Emails.send(params)
+
+        print(f"✅ Email enviado via Resend! ID: {response.get('id', 'N/A')}")
         return True
+
     except Exception as e:
-        print(f"❌ ERRO ao enviar email: {e}")
+        print(f"❌ ERRO ao enviar email via Resend: {e}")
         return False
 
 # -----------------------------------------------------------------------------
