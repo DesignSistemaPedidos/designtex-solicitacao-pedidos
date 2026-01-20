@@ -744,7 +744,7 @@ def home():
             <div class="col-md-6">
               <label for="razaoSocial" class="form-label">Razão Social do Cliente *</label>
               <div class="autocomplete-container">
-                <input type="text" class="form-control" id="razaoSocial" placeholder="Digite para buscar..." required/>
+                <input type="text" class="form-control" id="razaoSocial" placeholder="Digite o número ou o nome da razão social" required/>
                 <div id="autocomplete-dropdown" class="autocomplete-dropdown"></div>
               </div>
             </div>
@@ -938,27 +938,9 @@ function getTipoPrecoAtual() {
 function atualizarTodosPrecosProdutos() {
     document.querySelectorAll('[id^="produto-"]').forEach(prodDiv => {
         const pid = prodDiv.id.replace('produto-', '');
-        const artigoSelect = prodDiv.querySelector(`select.artigo-select[data-produto="${pid}"]`);
-        if (artigoSelect && artigoSelect.value) {
-            preencherCodigoEPreco(pid, artigoSelect.value);
-        }
-    });
-}
-
-function atualizarTodasListasDeArtigos() {
-    document.querySelectorAll('[id^="produto-"]').forEach(prodDiv => {
-        const pid = prodDiv.id.replace('produto-', '');
-        const artigoSelect = prodDiv.querySelector(`select.artigo-select[data-produto="${pid}"]`);
-        if (artigoSelect) {
-            let artigoAtual = artigoSelect.value;
-            artigoSelect.innerHTML = `<option value="">Selecione...</option>`;
-            gerarOpcoesArtigo().forEach(({ artigo }) => {
-                const opt = document.createElement("option");
-                opt.value = artigo;
-                opt.textContent = artigo;
-                artigoSelect.appendChild(opt);
-            });
-            if (artigoAtual) artigoSelect.value = artigoAtual;
+        const artigoInput = prodDiv.querySelector(`input.artigo-input[data-produto="${pid}"]`);
+        if (artigoInput && artigoInput.value) {
+            preencherCodigoEPreco(pid, artigoInput.value);
         }
     });
 }
@@ -987,9 +969,11 @@ function adicionarProduto() {
         <div class="row">
             <div class="col-md-3 mb-2">
                 <label class="form-label">Artigo *</label>
-                <select class="form-select artigo-select" data-produto="${contadorProdutos}" required>
-                    <option value="">Selecione...</option>
-                </select>
+                <div class="autocomplete-container">
+                    <input type="text" class="form-control artigo-input" data-produto="${contadorProdutos}" 
+                           placeholder="Digite o código ou nome do artigo" required autocomplete="off">
+                    <div class="artigo-dropdown autocomplete-dropdown" data-produto="${contadorProdutos}"></div>
+                </div>
             </div>
             <div class="col-md-2 mb-2">
                 <label class="form-label">Código</label>
@@ -1014,15 +998,6 @@ function adicionarProduto() {
     `;
     container.appendChild(produtoDiv);
 
-    const artigoSelect = produtoDiv.querySelector(`select.artigo-select[data-produto="${contadorProdutos}"]`);
-    artigoSelect.innerHTML = `<option value="">Selecione...</option>`;
-    gerarOpcoesArtigo().forEach(({ artigo }) => {
-        const opt = document.createElement("option");
-        opt.value = artigo;
-        opt.textContent = artigo;
-        artigoSelect.appendChild(opt);
-    });
-
     adicionarEventListenersProduto(contadorProdutos);
 }
 
@@ -1035,11 +1010,51 @@ function removerProduto(id) {
 }
 
 function adicionarEventListenersProduto(id) {
-    const artigoSelect = document.querySelector(`select.artigo-select[data-produto="${id}"]`);
-    artigoSelect.addEventListener('change', function() {
-        preencherCodigoEPreco(id, this.value);
-        calcularSubtotal(id);
+    const artigoInput = document.querySelector(`input.artigo-input[data-produto="${id}"]`);
+    const artigoDropdown = document.querySelector(`.artigo-dropdown[data-produto="${id}"]`);
+    
+    // Autocomplete para artigos
+    artigoInput.addEventListener('input', function() {
+        const query = this.value.trim().toLowerCase();
+        
+        if (query.length < 1) {
+            artigoDropdown.style.display = 'none';
+            return;
+        }
+        
+        const artigosFiltrados = gerarOpcoesArtigo().filter(a => 
+            a.artigo.toLowerCase().includes(query) || 
+            (a.codigo && a.codigo.toLowerCase().includes(query))
+        );
+        
+        if (artigosFiltrados.length === 0) {
+            artigoDropdown.style.display = 'none';
+            return;
+        }
+        
+        artigoDropdown.innerHTML = '';
+        artigosFiltrados.slice(0, 10).forEach(artigo => {
+            const item = document.createElement('div');
+            item.className = 'autocomplete-item';
+            item.innerHTML = `<strong>${artigo.artigo}</strong> <small style="color:#666;">(${artigo.codigo || 'S/C'})</small>`;
+            item.addEventListener('click', () => {
+                artigoInput.value = artigo.artigo;
+                artigoDropdown.style.display = 'none';
+                preencherCodigoEPreco(id, artigo.artigo);
+                calcularSubtotal(id);
+            });
+            artigoDropdown.appendChild(item);
+        });
+        artigoDropdown.style.display = 'block';
     });
+    
+    // Fechar dropdown ao clicar fora
+    artigoInput.addEventListener('blur', function() {
+        setTimeout(() => {
+            artigoDropdown.style.display = 'none';
+        }, 200);
+    });
+
     const metragemInput = document.querySelector(`input.metragem-input[data-produto="${id}"]`);
     metragemInput.addEventListener('input', function() {
         calcularSubtotal(id);
@@ -1162,10 +1177,53 @@ function limparFormulario() {
     }
 }
 
+// ============================= CAMPOS CONDICIONAIS =============================
+document.getElementById('tipoPedido').addEventListener('change', function() {
+    const campoOP = document.getElementById('campoNumeroOP');
+    if (this.value === 'OP') {
+        campoOP.style.display = 'block';
+        document.getElementById('numeroOP').setAttribute('required', 'required');
+    } else {
+        campoOP.style.display = 'none';
+        document.getElementById('numeroOP').removeAttribute('required');
+        document.getElementById('numeroOP').value = '';
+    }
+});
+
+document.getElementById('tipoFrete').addEventListener('change', function() {
+    const campoFOB = document.getElementById('campoTransportadoraFOB');
+    const campoCIF = document.getElementById('campoTransportadoraCIF');
+    
+    if (this.value === 'FOB') {
+        campoFOB.style.display = 'block';
+        campoCIF.style.display = 'none';
+        document.getElementById('transportadoraCIF').value = '';
+    } else if (this.value === 'CIF') {
+        campoFOB.style.display = 'none';
+        campoCIF.style.display = 'block';
+        document.getElementById('transportadoraFOB').value = '';
+    } else {
+        campoFOB.style.display = 'none';
+        campoCIF.style.display = 'none';
+    }
+});
+
+document.getElementById('vendaTriangular').addEventListener('change', function() {
+    const campoTriang = document.getElementById('campoTriangulacao');
+    if (this.value === 'Sim') {
+        campoTriang.style.display = 'block';
+    } else {
+        campoTriang.style.display = 'none';
+        document.getElementById('dadosTriangulacao').value = '';
+    }
+});
+
 // ============================= EVENT LISTENERS =============================
 document.addEventListener('click', function (e) {
     if (!e.target.closest('.autocomplete-container')) {
         document.getElementById('autocomplete-dropdown').style.display = 'none';
+        // Fechar todos os dropdowns de artigos
+        document.querySelectorAll('.artigo-dropdown').forEach(d => d.style.display = 'none');
     }
 });
 
@@ -1173,7 +1231,6 @@ document.querySelectorAll('input[name="tabelaPrecos"]').forEach(radio => {
     radio.addEventListener('change', function() {
         tipoPrecoAtual = getTipoPrecoAtual();
         atualizarTodosPrecosProdutos();
-        atualizarTodasListasDeArtigos();
     });
 });
 
@@ -1193,6 +1250,7 @@ document.getElementById('pedidoForm').addEventListener('submit', function(e) {
         return;
     }
 
+    // ✅ AJUSTE 1: Incluir TODOS os campos das condições do pedido
     const dadosPedido = {
         nomeRepresentante: document.getElementById('nomeRepresentante').value,
         razaoSocial: document.getElementById('razaoSocial').value,
@@ -1200,6 +1258,15 @@ document.getElementById('pedidoForm').addEventListener('submit', function(e) {
         telefone: document.getElementById('telefone').value,
         prazoPagamento: document.getElementById('prazoPagamento').value,
         tabelaPrecos: document.querySelector('input[name="tabelaPrecos"]:checked')?.value,
+        tipoPedido: document.getElementById('tipoPedido').value,
+        numeroOP: document.getElementById('numeroOP').value,
+        tipoProduto: document.getElementById('tipoProduto').value,
+        tipoFrete: document.getElementById('tipoFrete').value,
+        transportadoraFOB: document.getElementById('transportadoraFOB').value,
+        transportadoraCIF: document.getElementById('transportadoraCIF').value,
+        vendaTriangular: document.getElementById('vendaTriangular').value,
+        regimeRET: document.getElementById('regimeRET').value,
+        dadosTriangulacao: document.getElementById('dadosTriangulacao').value,
         observacoes: document.getElementById('observacoes').value,
         produtos: [],
         valorTotal: parseFloat(document.getElementById('valorTotal').textContent)
@@ -1208,7 +1275,7 @@ document.getElementById('pedidoForm').addEventListener('submit', function(e) {
     document.querySelectorAll('[id^="produto-"]').forEach(produtoDiv => {
         const produtoId = produtoDiv.id.replace('produto-', '');
         const produto = {
-            artigo: produtoDiv.querySelector(`select[data-produto="${produtoId}"]`).value,
+            artigo: produtoDiv.querySelector(`input.artigo-input[data-produto="${produtoId}"]`).value,
             codigo: produtoDiv.querySelector(`input.codigo-input[data-produto="${produtoId}"]`).value,
             desenho_cor: produtoDiv.querySelector(`input.desenho-input[data-produto="${produtoId}"]`).value,
             metragem: parseFloat(produtoDiv.querySelector(`input.metragem-input[data-produto="${produtoId}"]`).value),
@@ -1245,6 +1312,7 @@ window.addEventListener('load', function() {
         adicionarProduto();
     });
 });
+
 </script>
 
 
