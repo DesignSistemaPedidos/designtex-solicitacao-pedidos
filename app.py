@@ -1344,6 +1344,12 @@ function mostrarModalSucesso(numeroPedido) {
     const modalAnterior = document.getElementById('modalSucesso');
     if (modalAnterior) modalAnterior.remove();
     
+    // Detecta iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    const textoBtn = isIOS ? '📄 Visualizar PDF' : '📄 Baixar PDF';
+    const textoAjuda = isIOS ? '<small style="color:#666;display:block;margin-top:8px;">No iPhone: toque no PDF → clique no ícone de compartilhar ↑ → "Salvar em Arquivos"</small>' : '';
+    
     const modalHtml = `
         <div id="modalSucesso" style="
             position: fixed;
@@ -1356,6 +1362,8 @@ function mostrarModalSucesso(numeroPedido) {
             justify-content: center;
             align-items: center;
             z-index: 9999;
+            padding: 20px;
+            box-sizing: border-box;
         ">
             <div style="
                 background: white;
@@ -1374,25 +1382,30 @@ function mostrarModalSucesso(numeroPedido) {
                 <div style="display: flex; flex-direction: column; gap: 10px;">
                     <a href="/baixar-pedido/${numeroPedido}" 
                        target="_blank"
+                       rel="noopener noreferrer"
                        style="
                            background: #1a5490;
                            color: white;
-                           padding: 12px 20px;
+                           padding: 15px 20px;
                            border-radius: 8px;
                            text-decoration: none;
                            font-weight: bold;
                            display: block;
+                           font-size: 16px;
                        ">
-                        📄 Baixar/Visualizar PDF
+                        ${textoBtn}
                     </a>
+                    ${textoAjuda}
                     <button onclick="fecharModalELimpar()" style="
                         background: #6c757d;
                         color: white;
-                        padding: 12px 20px;
+                        padding: 15px 20px;
                         border-radius: 8px;
                         border: none;
                         font-weight: bold;
                         cursor: pointer;
+                        font-size: 16px;
+                        margin-top: 5px;
                     ">
                         ✓ Fechar e Novo Pedido
                     </button>
@@ -1403,6 +1416,7 @@ function mostrarModalSucesso(numeroPedido) {
     
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
+
 
 function fecharModalELimpar() {
     const modal = document.getElementById('modalSucesso');
@@ -1739,12 +1753,34 @@ def baixar_pedido(numero_pedido):
         pdf_buffer = gerar_pdf_pedido(dados_pedido, numero_pedido)
         if pdf_buffer is None:
             return "Erro ao gerar PDF", 500
-        return send_file(pdf_buffer, as_attachment=True,
-                         download_name=f"Pedido_DTX_{numero_pedido}.pdf",
-                         mimetype='application/pdf')
+
+        # ✅ Detecta se é iOS/Safari para exibir inline
+        user_agent = request.headers.get('User-Agent', '').lower()
+        is_ios = 'iphone' in user_agent or 'ipad' in user_agent
+        is_safari = 'safari' in user_agent and 'chrome' not in user_agent
+
+        if is_ios or is_safari:
+            # Exibe o PDF no navegador (funciona no Safari)
+            response = send_file(
+                pdf_buffer,
+                mimetype='application/pdf',
+                download_name=f"Pedido_DTX_{numero_pedido}.pdf"
+            )
+            response.headers[
+                'Content-Disposition'] = f'inline; filename="Pedido_DTX_{numero_pedido}.pdf"'
+            return response
+        else:
+            # Download normal para outros navegadores
+            return send_file(
+                pdf_buffer,
+                as_attachment=True,
+                download_name=f"Pedido_DTX_{numero_pedido}.pdf",
+                mimetype='application/pdf'
+            )
     except Exception as e:
         print(f"Erro no download: {e}")
         return "Erro inesperado", 500
+
 
 # Inicialização para produção (Gunicorn)
 
