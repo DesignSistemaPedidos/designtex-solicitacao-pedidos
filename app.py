@@ -446,7 +446,7 @@ def salvar_pedido(dados_pedido):
 
 
 def gerar_pdf_pedido(dados_pedido, numero_pedido):
-    """Gerar PDF do pedido com logo e condições do pedido"""
+    """Gerar PDF do pedido com logo e condições do pedido em 2 colunas"""
     import io
     from datetime import datetime
     from reportlab.lib.pagesizes import A4
@@ -519,20 +519,25 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
             ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),  # ✅ FUNDO BRANCO
             ('GRID', (0, 0), (-1, -1), 1, colors.black)
         ]))
         story.append(cliente_table)
-        story.append(Spacer(1, 16))
+        story.append(Spacer(1, 12))
 
-        # Condições do pedido (dinâmico: inclui só o que vier preenchido)
-        campos_condicoes = [
-            ('Prazo de Pagamento:', dados_pedido.get('prazoPagamento')),
+        # ✅ CONDIÇÕES DO PEDIDO EM 2 COLUNAS
+        # Coluna 1 (esquerda)
+        campos_col1 = [
+            ('Prazo Pagamento:', dados_pedido.get('prazoPagamento')),
             ('Tabela de Preços:', dados_pedido.get('tabelaPrecos')),
             ('Tipo Pedido:', dados_pedido.get('tipoPedido')),
             ('Número OP:', dados_pedido.get('numeroOP')),
             ('Tipo Produto:', dados_pedido.get('tipoProduto')),
+        ]
+        
+        # Coluna 2 (direita)
+        campos_col2 = [
             ('Tipo Frete:', dados_pedido.get('tipoFrete')),
             ('Venda Triangular:', dados_pedido.get('vendaTriangular')),
             ('Regime RET:', dados_pedido.get('regimeRET')),
@@ -540,25 +545,48 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
             ('Transportadora CIF:', dados_pedido.get('transportadoraCIF')),
             ('Dados Triangulação:', dados_pedido.get('dadosTriangulacao')),
         ]
-        condicoes_data = [['CONDIÇÕES DO PEDIDO', '']]
-        for rotulo, valor in campos_condicoes:
-            if valor not in (None, '', []):
-                condicoes_data.append([rotulo, str(valor)])
-
-        if len(condicoes_data) > 1:
-            condicoes_table = Table(condicoes_data, colWidths=[4*cm, 12*cm])
-            condicoes_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (1, 0), colors.grey),
-                ('TEXTCOLOR', (0, 0), (1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, -1), 10),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black)
-            ]))
-            story.append(condicoes_table)
-            story.append(Spacer(1, 16))
+        
+        # Filtra campos preenchidos
+        col1_data = [[r, str(v) if v else ''] for r, v in campos_col1 if v not in (None, '', [])]
+        col2_data = [[r, str(v) if v else ''] for r, v in campos_col2 if v not in (None, '', [])]
+        
+        # Iguala número de linhas
+        max_rows = max(len(col1_data), len(col2_data))
+        while len(col1_data) < max_rows:
+            col1_data.append(['', ''])
+        while len(col2_data) < max_rows:
+            col2_data.append(['', ''])
+        
+        # Monta tabela de condições em 2 colunas
+        condicoes_header = [['CONDIÇÕES DO PEDIDO', '', '', '']]
+        condicoes_rows = []
+        for i in range(max_rows):
+            row = [
+                col1_data[i][0], col1_data[i][1],
+                col2_data[i][0], col2_data[i][1]
+            ]
+            condicoes_rows.append(row)
+        
+        condicoes_data = condicoes_header + condicoes_rows
+        
+        condicoes_table = Table(condicoes_data, colWidths=[3.5*cm, 4.5*cm, 3.5*cm, 4.5*cm])
+        condicoes_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('SPAN', (0, 0), (-1, 0)),  # Mescla cabeçalho
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('ALIGN', (0, 1), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.white),  # ✅ FUNDO BRANCO
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTNAME', (0, 1), (0, -1), 'Helvetica-Bold'),  # Labels col1 em negrito
+            ('FONTNAME', (2, 1), (2, -1), 'Helvetica-Bold'),  # Labels col2 em negrito
+        ]))
+        story.append(condicoes_table)
+        story.append(Spacer(1, 12))
 
         # Produtos
         produtos_data = [['Artigo', 'Código',
@@ -583,26 +611,27 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
-            ('BACKGROUND', (0, 1), (-1, -2), colors.beige),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('BACKGROUND', (0, 1), (-1, -2), colors.white),  # ✅ FUNDO BRANCO
             ('BACKGROUND', (0, -1), (-1, -1), colors.lightgrey),
             ('GRID', (0, 0), (-1, -1), 1, colors.black)
         ]))
         story.append(produtos_table)
-        story.append(Spacer(1, 16))
+        story.append(Spacer(1, 12))
 
         # Observações
         obs = dados_pedido.get('observacoes')
         if obs:
-            story.append(Paragraph("OBSERVAÇÕES:", styles['Heading2']))
+            story.append(Paragraph("<b>OBSERVAÇÕES:</b>", styles['Normal']))
+            story.append(Spacer(1, 4))
             story.append(Paragraph(obs, styles['Normal']))
-            story.append(Spacer(1, 12))
+            story.append(Spacer(1, 10))
 
         # Rodapé
-        story.append(Spacer(1, 10))
+        story.append(Spacer(1, 8))
         story.append(Paragraph(
             f"Pedido gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles['Normal']))
-        story.append(Spacer(1, 6))
+        story.append(Spacer(1, 4))
         story.append(Paragraph(
             "<b>Pedido sujeito à confirmação da Empresa Fornecedora.</b>", styles['Centralizado']))
 
@@ -613,7 +642,6 @@ def gerar_pdf_pedido(dados_pedido, numero_pedido):
     except Exception as e:
         print(f"Erro ao gerar PDF: {e}")
         return None
-
 
 # -----------------------------------------------------------------------------
 # Flask app
@@ -1250,7 +1278,6 @@ document.getElementById('pedidoForm').addEventListener('submit', function(e) {
         return;
     }
 
-    // ✅ AJUSTE 1: Incluir TODOS os campos das condições do pedido
     const dadosPedido = {
         nomeRepresentante: document.getElementById('nomeRepresentante').value,
         razaoSocial: document.getElementById('razaoSocial').value,
@@ -1293,7 +1320,18 @@ document.getElementById('pedidoForm').addEventListener('submit', function(e) {
     .then(r => r.json())
     .then(data => {
         if (data.sucesso) {
-            alert(`Pedido enviado com sucesso! Número: ${data.numero_pedido}`);
+            // ✅ Pergunta se quer baixar o PDF
+            const baixarPdf = confirm(
+                `✅ Pedido enviado com sucesso!\n\n` +
+                `Número: ${data.numero_pedido}\n\n` +
+                `Deseja baixar uma cópia do pedido em PDF?`
+            );
+            
+            if (baixarPdf) {
+                // Abre o download do PDF
+                window.open(`/baixar-pedido/${data.numero_pedido}`, '_blank');
+            }
+            
             limparFormulario();
         } else {
             alert(`Erro ao enviar pedido: ${data.erro}`);
@@ -1304,6 +1342,7 @@ document.getElementById('pedidoForm').addEventListener('submit', function(e) {
         alert('Erro ao enviar pedido. Tente novamente.');
     });
 });
+
 
 // ============================= INICIALIZAÇÃO =============================
 window.addEventListener('load', function() {
