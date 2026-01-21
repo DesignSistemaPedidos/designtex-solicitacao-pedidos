@@ -851,6 +851,7 @@ def home():
                                 <option value="">Selecione...</option>
                                 <option value="Liso">Liso</option>
                                 <option value="Estampado">Estampado</option>
+                                <option value="Liso/Estampado">Liso/Estampado</option>
                                 <option value="Digital">Digital</option>
                             </select>
                         </div>
