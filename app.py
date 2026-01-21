@@ -989,52 +989,61 @@ function gerarOpcoesArtigo() {
 
 function adicionarProduto() {
     contadorProdutos++;
-    const container = document.getElementById('produtos-container');
-    const produtoDiv = document.createElement('div');
+    
+    // Pega os valores do primeiro produto (se existir)
+    var primeiroArtigo = '';
+    var primeiroCodigo = '';
+    var primeiroPreco = '';
+    var inputArtigo = document.querySelector('input.artigo-input');
+    var inputCodigo = document.querySelector('input.codigo-input');
+    var inputPreco = document.querySelector('input.preco-input');
+    if (inputArtigo) primeiroArtigo = inputArtigo.value;
+    if (inputCodigo) primeiroCodigo = inputCodigo.value;
+    if (inputPreco) primeiroPreco = inputPreco.value;
+    
+    var container = document.getElementById('produtos-container');
+    var produtoDiv = document.createElement('div');
     produtoDiv.className = 'border rounded p-3 mb-3';
-    produtoDiv.id = `produto-${contadorProdutos}`;
+    produtoDiv.id = 'produto-' + contadorProdutos;
 
-    produtoDiv.innerHTML = `
-        <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="mb-0">Produto ${contadorProdutos}</h6>
-            <button type="button" class="btn btn-danger btn-sm" onclick="removerProduto(${contadorProdutos})">
-                🗑️ Remover
-            </button>
-        </div>
-        <div class="row">
-            <div class="col-md-3 mb-2">
-                <label class="form-label">Artigo *</label>
-                <div class="autocomplete-container">
-                    <input type="text" class="form-control artigo-input" data-produto="${contadorProdutos}" 
-                           placeholder="Digite o código ou nome do artigo" required autocomplete="off">
-                    <div class="artigo-dropdown autocomplete-dropdown" data-produto="${contadorProdutos}"></div>
-                </div>
-            </div>
-            <div class="col-md-2 mb-2">
-                <label class="form-label">Código</label>
-                <input type="text" class="form-control codigo-input" data-produto="${contadorProdutos}" readonly>
-            </div>
-            <div class="col-md-3 mb-2">
-                <label class="form-label">Desenho/Cor *</label>
-                <input type="text" class="form-control desenho-input" data-produto="${contadorProdutos}" required>
-            </div>
-            <div class="col-md-2 mb-2">
-                <label class="form-label">Metragem *</label>
-                <input type="number" class="form-control metragem-input" data-produto="${contadorProdutos}" min="0.01" step="0.01" required>
-            </div>
-            <div class="col-md-2 mb-2">
-                <label class="form-label">Preço Unitário</label>
-                <input type="number" class="form-control preco-input" data-produto="${contadorProdutos}" step="0.01" readonly>
-            </div>
-        </div>
-        <div class="text-end">
-            <strong>Subtotal: R$ <span class="subtotal" data-produto="${contadorProdutos}">0.00</span></strong>
-        </div>
-    `;
+    var htmlContent = '<div class="d-flex justify-content-between align-items-center mb-2">' +
+        '<h6 class="mb-0">Produto ' + contadorProdutos + '</h6>' +
+        '<button type="button" class="btn btn-danger btn-sm" onclick="removerProduto(' + contadorProdutos + ')">' +
+        '🗑️ Remover</button></div>' +
+        '<div class="row">' +
+        '<div class="col-md-3 mb-2">' +
+        '<label class="form-label">Artigo *</label>' +
+        '<div class="autocomplete-container">' +
+        '<input type="text" class="form-control artigo-input" data-produto="' + contadorProdutos + '" ' +
+        'placeholder="Digite o código ou nome do artigo" required autocomplete="off" value="' + primeiroArtigo + '">' +
+        '<div class="artigo-dropdown autocomplete-dropdown" data-produto="' + contadorProdutos + '"></div>' +
+        '</div></div>' +
+        '<div class="col-md-2 mb-2">' +
+        '<label class="form-label">Código</label>' +
+        '<input type="text" class="form-control codigo-input" data-produto="' + contadorProdutos + '" readonly value="' + primeiroCodigo + '">' +
+        '</div>' +
+        '<div class="col-md-3 mb-2">' +
+        '<label class="form-label">Desenho/Cor *</label>' +
+        '<input type="text" class="form-control desenho-input" data-produto="' + contadorProdutos + '" required>' +
+        '</div>' +
+        '<div class="col-md-2 mb-2">' +
+        '<label class="form-label">Metragem *</label>' +
+        '<input type="number" class="form-control metragem-input" data-produto="' + contadorProdutos + '" min="0.01" step="0.01" required>' +
+        '</div>' +
+        '<div class="col-md-2 mb-2">' +
+        '<label class="form-label">Preço Unitário</label>' +
+        '<input type="number" class="form-control preco-input" data-produto="' + contadorProdutos + '" step="0.01" readonly value="' + primeiroPreco + '">' +
+        '</div></div>' +
+        '<div class="text-end">' +
+        '<strong>Subtotal: R$ <span class="subtotal" data-produto="' + contadorProdutos + '">0.00</span></strong>' +
+        '</div>';
+
+    produtoDiv.innerHTML = htmlContent;
     container.appendChild(produtoDiv);
 
     adicionarEventListenersProduto(contadorProdutos);
 }
+
 
 function removerProduto(id) {
     const produto = document.getElementById(`produto-${id}`);
