@@ -60,7 +60,7 @@ EMAIL_FROM = os.getenv('EMAIL_FROM', 'pedido@designtextecidos.com.br')
 
 
 def enviar_email_pedido_completo(dados_pedido, numero_pedido, pdf_buffer):
-    """Envia email com PDF anexo usando Resend API"""
+    """Envia email com PDF anexo usando Resend API - corpo completo igual ao PDF"""
     try:
         if not RESEND_API_KEY:
             print("⚠️ RESEND_API_KEY não configurada. Pulando envio de email.")
@@ -68,43 +68,142 @@ def enviar_email_pedido_completo(dados_pedido, numero_pedido, pdf_buffer):
 
         resend.api_key = RESEND_API_KEY
 
-        # Preparar corpo HTML
+        # Montar tabela de produtos
+        produtos_html = ""
+        for produto in dados_pedido.get('produtos', []):
+            produtos_html += f"""
+                <tr>
+                    <td style="padding:8px;border:1px solid #ddd;font-size:10px;">{produto.get('artigo', '')}</td>
+                    <td style="padding:8px;border:1px solid #ddd;font-size:10px;">{produto.get('codigo', '')}</td>
+                    <td style="padding:8px;border:1px solid #ddd;font-size:10px;">{produto.get('desenho_cor', '')}</td>
+                    <td style="padding:8px;border:1px solid #ddd;font-size:10px;text-align:right;">{(produto.get('metragem') or 0):.2f}</td>
+                    <td style="padding:8px;border:1px solid #ddd;font-size:10px;text-align:right;">R$ {(produto.get('preco') or 0):.2f}</td>
+                    <td style="padding:8px;border:1px solid #ddd;font-size:10px;text-align:right;">R$ {(produto.get('subtotal') or 0):.2f}</td>
+                </tr>
+            """
+
+        # Preparar corpo HTML completo
         corpo_html = f"""
-        <html><body style="font-family: Arial, sans-serif; line-height:1.6; color:#333;">
-            <div style="background:#1a5490;color:white;padding:20px;text-align:center;">
-                <h1 style="margin:0;">🏭 DESIGNTEX TECIDOS</h1>
-                <h2 style="margin:10px 0 0 0;">NOVA SOLICITAÇÃO DE PEDIDO DE VENDAS</h2>
+        <html>
+        <body style="font-family: Arial, sans-serif; font-size:10px; line-height:1.5; color:#333; margin:0; padding:20px;">
+            
+            <!-- CABEÇALHO -->
+            <div style="background:#1a5490;color:white;padding:15px;text-align:center;border-radius:8px 8px 0 0;">
+                <h1 style="margin:0;font-size:18px;">🏭 DESIGNTEX TECIDOS</h1>
+                <p style="margin:5px 0 0 0;font-size:10px;">Telefone: (31) 3286-2853 | CNPJ: 13.016.585/0001-80</p>
+                <p style="margin:3px 0 0 0;font-size:10px;">Av. Barão Homem de Melo, 1275 - Nova Granada - Belo Horizonte/MG - 30431-285</p>
             </div>
-            <div style="padding:20px;">
-                <h3 style="color:#1a5490;">📋 DADOS DO PEDIDO</h3>
-                <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+            
+            <!-- TÍTULO DO PEDIDO -->
+            <div style="background:#f0f0f0;padding:12px;text-align:center;border:1px solid #ddd;border-top:none;">
+                <h2 style="margin:0;color:#1a5490;font-size:14px;">SOLICITAÇÃO DE PEDIDO DE VENDAS Nº {numero_pedido}</h2>
+                <p style="margin:5px 0 0 0;font-size:10px;color:#666;">Recebido em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</p>
+            </div>
+            
+            <!-- DADOS DO CLIENTE -->
+            <div style="margin-top:15px;">
+                <table style="width:100%;border-collapse:collapse;">
                     <tr>
-                        <td style="padding:12px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;width:150px;">Número:</td>
-                        <td style="padding:12px;border:1px solid #ddd;"><strong>#{numero_pedido}</strong></td>
+                        <td colspan="2" style="background:#1a5490;color:white;padding:8px;font-weight:bold;font-size:11px;">📋 DADOS DO CLIENTE</td>
                     </tr>
                     <tr>
-                        <td style="padding:12px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">Representante:</td>
-                        <td style="padding:12px;border:1px solid #ddd;">{dados_pedido.get('nomeRepresentante', '')}</td>
+                        <td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;width:150px;font-size:10px;">Representante:</td>
+                        <td style="padding:8px;border:1px solid #ddd;font-size:10px;">{dados_pedido.get('nomeRepresentante', '')}</td>
                     </tr>
                     <tr>
-                        <td style="padding:12px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">Cliente:</td>
-                        <td style="padding:12px;border:1px solid #ddd;">{dados_pedido.get('razaoSocial', '')}</td>
+                        <td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;font-size:10px;">Cliente:</td>
+                        <td style="padding:8px;border:1px solid #ddd;font-size:10px;">{dados_pedido.get('razaoSocial', '')}</td>
                     </tr>
                     <tr>
-                        <td style="padding:12px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">CNPJ:</td>
-                        <td style="padding:12px;border:1px solid #ddd;">{dados_pedido.get('cnpj', '')}</td>
+                        <td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;font-size:10px;">CNPJ:</td>
+                        <td style="padding:8px;border:1px solid #ddd;font-size:10px;">{dados_pedido.get('cnpj', '')}</td>
                     </tr>
                     <tr>
-                        <td style="padding:12px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;">Valor Total:</td>
-                        <td style="padding:12px;border:1px solid #ddd;"><strong style="color:#1a5490;font-size:18px;">R$ {dados_pedido.get('valorTotal', 0):.2f}</strong></td>
+                        <td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;font-size:10px;">Telefone:</td>
+                        <td style="padding:8px;border:1px solid #ddd;font-size:10px;">{dados_pedido.get('telefone', '')}</td>
                     </tr>
                 </table>
-                <div style="text-align:center;margin-top:20px;padding:15px;background:#1a5490;color:white;border-radius:5px;">
-                    <p style="margin:0;"><strong>Sistema de Pedidos DESIGNTEX TECIDOS</strong></p>
-                    <p style="margin:5px 0 0 0;font-size:12px;">Recebido em: {datetime.now().strftime('%d/%m/%Y às %H:%M:%S')}</p>
-                </div>
             </div>
-        </body></html>
+            
+            <!-- CONDIÇÕES DO PEDIDO -->
+            <div style="margin-top:15px;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <tr>
+                        <td colspan="4" style="background:#1a5490;color:white;padding:8px;font-weight:bold;font-size:11px;">⚙️ CONDIÇÕES DO PEDIDO</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;font-size:10px;width:25%;">Prazo Pagamento:</td>
+                        <td style="padding:8px;border:1px solid #ddd;font-size:10px;width:25%;">{dados_pedido.get('prazoPagamento', '')}</td>
+                        <td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;font-size:10px;width:25%;">Tipo Frete:</td>
+                        <td style="padding:8px;border:1px solid #ddd;font-size:10px;width:25%;">{dados_pedido.get('tipoFrete', '')}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;font-size:10px;">Tabela de Preços:</td>
+                        <td style="padding:8px;border:1px solid #ddd;font-size:10px;">{dados_pedido.get('tabelaPrecos', '')}</td>
+                        <td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;font-size:10px;">Venda Triangular:</td>
+                        <td style="padding:8px;border:1px solid #ddd;font-size:10px;">{dados_pedido.get('vendaTriangular', '')}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;font-size:10px;">Tipo Pedido:</td>
+                        <td style="padding:8px;border:1px solid #ddd;font-size:10px;">{dados_pedido.get('tipoPedido', '')}{(' - OP: ' + dados_pedido.get('numeroOP', '')) if dados_pedido.get('numeroOP') else ''}</td>
+                        <td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;font-size:10px;">Regime RET:</td>
+                        <td style="padding:8px;border:1px solid #ddd;font-size:10px;">{dados_pedido.get('regimeRET', '')}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;font-size:10px;">Tipo Produto:</td>
+                        <td style="padding:8px;border:1px solid #ddd;font-size:10px;">{dados_pedido.get('tipoProduto', '')}</td>
+                        <td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;font-size:10px;">Transportadora:</td>
+                        <td style="padding:8px;border:1px solid #ddd;font-size:10px;">{dados_pedido.get('transportadoraFOB', '') or dados_pedido.get('transportadoraCIF', '') or '-'}</td>
+                    </tr>
+                    {f'''<tr>
+                        <td style="padding:8px;border:1px solid #ddd;background:#f9f9f9;font-weight:bold;font-size:10px;">Dados Triangulação:</td>
+                        <td colspan="3" style="padding:8px;border:1px solid #ddd;font-size:10px;">{dados_pedido.get('dadosTriangulacao', '')}</td>
+                    </tr>''' if dados_pedido.get('dadosTriangulacao') else ''}
+                </table>
+            </div>
+            
+            <!-- PRODUTOS -->
+            <div style="margin-top:15px;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <tr>
+                        <td colspan="6" style="background:#1a5490;color:white;padding:8px;font-weight:bold;font-size:11px;">📦 PRODUTOS</td>
+                    </tr>
+                    <tr style="background:#e9e9e9;">
+                        <th style="padding:8px;border:1px solid #ddd;font-size:10px;text-align:left;">Artigo</th>
+                        <th style="padding:8px;border:1px solid #ddd;font-size:10px;text-align:left;">Código</th>
+                        <th style="padding:8px;border:1px solid #ddd;font-size:10px;text-align:left;">Desenho/Cor</th>
+                        <th style="padding:8px;border:1px solid #ddd;font-size:10px;text-align:right;">Metragem</th>
+                        <th style="padding:8px;border:1px solid #ddd;font-size:10px;text-align:right;">Preço</th>
+                        <th style="padding:8px;border:1px solid #ddd;font-size:10px;text-align:right;">Subtotal</th>
+                    </tr>
+                    {produtos_html}
+                    <tr style="background:#f0f0f0;">
+                        <td colspan="5" style="padding:10px;border:1px solid #ddd;font-size:11px;text-align:right;font-weight:bold;">VALOR TOTAL:</td>
+                        <td style="padding:10px;border:1px solid #ddd;font-size:12px;text-align:right;font-weight:bold;color:#1a5490;">R$ {dados_pedido.get('valorTotal', 0):.2f}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <!-- OBSERVAÇÕES -->
+            {f'''<div style="margin-top:15px;">
+                <table style="width:100%;border-collapse:collapse;">
+                    <tr>
+                        <td style="background:#1a5490;color:white;padding:8px;font-weight:bold;font-size:11px;">📝 OBSERVAÇÕES</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border:1px solid #ddd;font-size:10px;background:#fffef0;">{dados_pedido.get('observacoes', '')}</td>
+                    </tr>
+                </table>
+            </div>''' if dados_pedido.get('observacoes') else ''}
+            
+            <!-- RODAPÉ -->
+            <div style="margin-top:20px;text-align:center;padding:15px;background:#1a5490;color:white;border-radius:0 0 8px 8px;">
+                <p style="margin:0;font-size:10px;font-weight:bold;">Pedido sujeito à confirmação da Empresa Fornecedora.</p>
+                <p style="margin:5px 0 0 0;font-size:9px;">Sistema de Pedidos DESIGNTEX TECIDOS</p>
+            </div>
+            
+        </body>
+        </html>
         """
 
         # Preparar anexo PDF
@@ -114,7 +213,6 @@ def enviar_email_pedido_completo(dados_pedido, numero_pedido, pdf_buffer):
             nome_arquivo = f"Pedido_DTX_{numero_pedido}.pdf"
             attachments.append({
                 "filename": nome_arquivo,
-                # Resend espera lista de bytes
                 "content": list(pdf_buffer.read()),
             })
 
@@ -818,6 +916,7 @@ def home():
                                 <option>56/63/70/77/84 dias</option>
                                 <option>28/56/84/112/140 dias</option>
                                 <option>56/70/84/98/112 dias</option>
+                                <option>Outros - Digitar o prazo nas observações</option>
                             </select>
                         </div>
 
