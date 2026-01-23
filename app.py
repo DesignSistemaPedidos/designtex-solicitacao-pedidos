@@ -54,7 +54,7 @@ configurar_encoding()
 
 RESEND_API_KEY = os.getenv('RESEND_API_KEY', '')
 EMAIL_DESTINOS = os.getenv(
-    'EMAIL_TO', 'pedido@designtextecidos.com.br,design2@designtextecidos.com.br,guilherme@designtextecidos.com.br').split(',')
+    'EMAIL_TO', 'pedido@designtextecidos.com.br,design2@designtextecidos.com.br,guilherme@designtextecidos.com.br,gabriel@designtextecidos.com.br').split(',')
 # Ou seu domínio verificado
 EMAIL_FROM = os.getenv('EMAIL_FROM', 'pedido@designtextecidos.com.br')
 
@@ -1912,3 +1912,4 @@ if __name__ == '__main__':
 
 # NÃO chamar ensure_db_initialized() aqui fora!
 # O Gunicorn vai usar o app diretamente e o before_request cuida da inicialização
+
